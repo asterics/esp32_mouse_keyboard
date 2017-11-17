@@ -321,6 +321,7 @@ void process_uart(uint8_t *input, uint16_t len)
     {
         for(uint8_t i = 0; i < sizeof(keycode_arr); i++) keycode_arr[i] = 0;
         keycode_modifier = 0;
+        keycode_deadkey_first = 0;
         esp_hidd_send_keyboard_value(hid_conn_id,keycode_modifier,keycode_arr,sizeof(keycode_arr));
         ESP_LOGD(DEBUG_TAG,"keyboard: release all (KR)");
         return;
@@ -395,12 +396,17 @@ void process_uart(uint8_t *input, uint16_t len)
             //keyboard, get keycode for unicode bytes
             if(input[1] == 'C' && len == 4) 
             {
-                keycode = get_keycode((input[2] << 8) || input[3],config.locale,&keycode_modifier,&keycode_deadkey_first);
-                
-                //TODO: do deadkey sequence...
-                
+                keycode = get_keycode(input[2],config.locale,&keycode_modifier,&keycode_deadkey_first);
+                //if the first byte is not sufficient, try with second byte.
+                if(keycode == 0) 
+                { 
+                    keycode = get_keycode(input[3],config.locale,&keycode_modifier,&keycode_deadkey_first);
+                }
+                //first the keycode + modifier are sent.
+                //deadkey starting key is sent afterwards (0 if not necessary)
                 uart_write_bytes(EX_UART_NUM, (char *)&keycode, sizeof(keycode));
                 uart_write_bytes(EX_UART_NUM, (char *)&keycode_modifier, sizeof(keycode_modifier));
+                uart_write_bytes(EX_UART_NUM, (char *)&keycode_deadkey_first, sizeof(keycode_deadkey_first));
                 uart_write_bytes(EX_UART_NUM, &nl, sizeof(nl));
                 return;
             }
@@ -573,12 +579,11 @@ void uart_stdin(void *pvParameters)
                     break;
                 case 'Q':
                     //send only lower characters
+                    vTaskDelay(1000 / portTICK_PERIOD_MS);
                     keycode = 28;
                     esp_hidd_send_keyboard_value(hid_conn_id,0,&keycode,1);
                     keycode = 0;
                     esp_hidd_send_keyboard_value(hid_conn_id,0,&keycode,1);
-                    vTaskDelay(1000 / portTICK_PERIOD_MS);
-                    
                     break;
             }
         }

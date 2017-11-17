@@ -40,7 +40,7 @@ TBD: currently the UART is not configured, this parser is just used by the stdin
 commands, it will be changed and the configured GPIO pins are stated here.
 
 |Command|Function|Parameters|Description|
-|---|---|---|---|---|
+|-------|--------|----------|-----------|
 |ID|Get ID|--|Prints out the ID of this module, used to determine version or attached module type|
 |GP|Get BLE pairings|--|Prints out all paired devices' MAC adress. The order is used for DP as well, starting with 0|
 |DP|Delete one pairing|number of pairing, either as ASCII '0'-'9' or 0x00-0x09|Deletes one pairing. The pairing number is determined by the command GP|

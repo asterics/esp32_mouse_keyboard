@@ -26,7 +26,7 @@
 #include "esp_event_loop.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "bt.h"
+#include "esp_bt.h"
 
 #include "config.h"
 

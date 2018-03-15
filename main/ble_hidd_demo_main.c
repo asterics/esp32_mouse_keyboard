@@ -211,17 +211,60 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
         esp_ble_gap_start_advertising(&hidd_adv_params);
         break;
-     case ESP_GAP_BLE_SEC_REQ_EVT:
+     /*case ESP_GAP_BLE_SEC_REQ_EVT:
         for(int i = 0; i < ESP_BD_ADDR_LEN; i++) {
              LOG_DEBUG("%x:",param->ble_security.ble_req.bd_addr[i]);
         }
         esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
-	 break;
+	 break;*/
      case ESP_GAP_BLE_AUTH_CMPL_EVT:
         sec_conn = true;
-        LOG_ERROR("status = %s, ESP_GAP_BLE_AUTH_CMPL_EVT",param->ble_security.auth_cmpl.success ? "success" : "fail");
+        if(param->ble_security.auth_cmpl.success)
+        {
+            LOG_INFO("status = success, ESP_GAP_BLE_AUTH_CMPL_EVT");
+        } else {
+            LOG_INFO("status = fail, ESP_GAP_BLE_AUTH_CMPL_EVT");
+        }
         break;
+    //unused events 
+    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT: break;
+    //do we need this? occurs on win10 connect.
+    case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT: break;
+    
+    case ESP_GAP_BLE_PASSKEY_REQ_EVT:                           /* passkey request event */
+        //esp_ble_passkey_reply(gl_profile_tab[PROFILE_A_APP_ID].remote_bda, true, 0x00);
+        LOG_INFO("ESP_GAP_BLE_PASSKEY_REQ_EVT");
+        break;
+    case ESP_GAP_BLE_OOB_REQ_EVT:                                /* OOB request event */
+        LOG_INFO("ESP_GAP_BLE_OOB_REQ_EVT");
+        break;
+    case ESP_GAP_BLE_LOCAL_IR_EVT:                               /* BLE local IR event */
+        LOG_INFO("ESP_GAP_BLE_LOCAL_IR_EVT");
+        break;
+    case ESP_GAP_BLE_LOCAL_ER_EVT:                               /* BLE local ER event */
+        LOG_INFO("ESP_GAP_BLE_LOCAL_ER_EVT");
+        break;
+    case ESP_GAP_BLE_NC_REQ_EVT:
+        LOG_INFO("ESP_GAP_BLE_NC_REQ_EVT");
+        break;
+    case ESP_GAP_BLE_SEC_REQ_EVT:
+        /* send the positive(true) security response to the peer device to accept the security request.
+        If not accept the security request, should sent the security response with negative(false) accept value*/
+        esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
+        LOG_INFO("ESP_GAP_BLE_SEC_REQ_EVT");
+        break;
+    
+    case ESP_GAP_BLE_PASSKEY_NOTIF_EVT:  ///the app will receive this evt when the IO  has Output capability and the peer device IO has Input capability.
+        ///show the passkey number to the user to input it in the peer deivce.
+        LOG_INFO("The passkey Notify number:%d", param->ble_security.key_notif.passkey);
+        break;
+    case ESP_GAP_BLE_KEY_EVT:
+        //shows the ble key info share with peer device to the user.
+        LOG_INFO("key type = %d", param->ble_security.ble_key.key_type);
+        break;
+    
     default:
+        LOG_WARN("unhandled event: %d",event);
         break;
     }
 }
@@ -662,7 +705,14 @@ void app_main()
 
     /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_BOND;     //bonding with peer device after authentication
-    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
+    /** Do not use "NONE", HID over GATT requires something more than NONE */
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
+    /** CAP_OUT & CAP_IO work with Winsh***t, but you need to enter a pin which is shown in "make monitor" */
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;           //set the IO capability to No output No input
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_IO;           //set the IO capability to No output No input
+    /** CAP_IN: host shows you a pin, you have to enter it (unimplemented now) */
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_IN;           //set the IO capability to No output No input
+    
     uint8_t key_size = 16;      //the key size should be 7~16 bytes
     uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;

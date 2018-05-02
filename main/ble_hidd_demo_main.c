@@ -37,7 +37,6 @@
 #include "esp_gatt_defs.h"
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
-#include "bt_trace.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "hid_dev.h"
@@ -189,17 +188,18 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
 		case ESP_HIDD_EVENT_BLE_CONNECT: {
             hid_conn_id = param->connect.conn_id;
             sec_conn = true; //TODO: right here?!?
-            LOG_ERROR("%s(), ESP_HIDD_EVENT_BLE_CONNECT", __func__);
+            ESP_LOGE(GATTS_TAG,"%s(), ESP_HIDD_EVENT_BLE_CONNECT", __func__);
             break;
         }
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             sec_conn = false;
             hid_conn_id = 0;
-            LOG_ERROR("%s(), ESP_HIDD_EVENT_BLE_DISCONNECT", __func__);
+            ESP_LOGE(GATTS_TAG,"%s(), ESP_HIDD_EVENT_BLE_DISCONNECT", __func__);
             esp_ble_gap_start_advertising(&hidd_adv_params);
             break;
         }
         default:
+            ESP_LOGE(GATTS_TAG,"%s(), unhandled event: %d", __func__,event);
             break;
     }
     return;
@@ -221,9 +221,9 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         sec_conn = true;
         if(param->ble_security.auth_cmpl.success)
         {
-            LOG_INFO("status = success, ESP_GAP_BLE_AUTH_CMPL_EVT");
+            ESP_LOGI(GATTS_TAG,"status = success, ESP_GAP_BLE_AUTH_CMPL_EVT");
         } else {
-            LOG_INFO("status = fail, ESP_GAP_BLE_AUTH_CMPL_EVT");
+            ESP_LOGI(GATTS_TAG,"status = fail, ESP_GAP_BLE_AUTH_CMPL_EVT");
         }
         break;
     //unused events 
@@ -233,38 +233,38 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     
     case ESP_GAP_BLE_PASSKEY_REQ_EVT:                           /* passkey request event */
         //esp_ble_passkey_reply(gl_profile_tab[PROFILE_A_APP_ID].remote_bda, true, 0x00);
-        LOG_INFO("ESP_GAP_BLE_PASSKEY_REQ_EVT");
+        ESP_LOGI(GATTS_TAG,"ESP_GAP_BLE_PASSKEY_REQ_EVT");
         break;
     case ESP_GAP_BLE_OOB_REQ_EVT:                                /* OOB request event */
-        LOG_INFO("ESP_GAP_BLE_OOB_REQ_EVT");
+        ESP_LOGI(GATTS_TAG,"ESP_GAP_BLE_OOB_REQ_EVT");
         break;
     case ESP_GAP_BLE_LOCAL_IR_EVT:                               /* BLE local IR event */
-        LOG_INFO("ESP_GAP_BLE_LOCAL_IR_EVT");
+        ESP_LOGI(GATTS_TAG,"ESP_GAP_BLE_LOCAL_IR_EVT");
         break;
     case ESP_GAP_BLE_LOCAL_ER_EVT:                               /* BLE local ER event */
-        LOG_INFO("ESP_GAP_BLE_LOCAL_ER_EVT");
+        ESP_LOGI(GATTS_TAG,"ESP_GAP_BLE_LOCAL_ER_EVT");
         break;
     case ESP_GAP_BLE_NC_REQ_EVT:
-        LOG_INFO("ESP_GAP_BLE_NC_REQ_EVT");
+        ESP_LOGI(GATTS_TAG,"ESP_GAP_BLE_NC_REQ_EVT");
         break;
     case ESP_GAP_BLE_SEC_REQ_EVT:
         /* send the positive(true) security response to the peer device to accept the security request.
         If not accept the security request, should sent the security response with negative(false) accept value*/
         esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
-        LOG_INFO("ESP_GAP_BLE_SEC_REQ_EVT");
+        ESP_LOGI(GATTS_TAG,"ESP_GAP_BLE_SEC_REQ_EVT");
         break;
     
     case ESP_GAP_BLE_PASSKEY_NOTIF_EVT:  ///the app will receive this evt when the IO  has Output capability and the peer device IO has Input capability.
         ///show the passkey number to the user to input it in the peer deivce.
-        LOG_INFO("The passkey Notify number:%d", param->ble_security.key_notif.passkey);
+        ESP_LOGI(GATTS_TAG,"The passkey Notify number:%d", param->ble_security.key_notif.passkey);
         break;
     case ESP_GAP_BLE_KEY_EVT:
         //shows the ble key info share with peer device to the user.
-        LOG_INFO("key type = %d", param->ble_security.ble_key.key_type);
+        ESP_LOGI(GATTS_TAG,"key type = %d", param->ble_security.ble_key.key_type);
         break;
     
     default:
-        LOG_WARN("unhandled event: %d",event);
+        ESP_LOGW(GATTS_TAG,"unhandled event: %d",event);
         break;
     }
 }
@@ -682,13 +682,13 @@ void app_main()
 
     ret = esp_bluedroid_init();
     if (ret) {
-        LOG_ERROR("%s init bluedroid failed\n", __func__);
+        ESP_LOGE(GATTS_TAG,"%s init bluedroid failed\n", __func__);
         return;
     }
 
     ret = esp_bluedroid_enable();
     if (ret) {
-        LOG_ERROR("%s init bluedroid failed\n", __func__);
+        ESP_LOGE(GATTS_TAG,"%s init bluedroid failed\n", __func__);
         return;
     }
     
@@ -696,7 +696,7 @@ void app_main()
     hidd_set_countrycode(get_hid_country_code(config.locale));
 
     if((ret = esp_hidd_profile_init()) != ESP_OK) {
-        LOG_ERROR("%s init bluedroid failed\n", __func__);
+        ESP_LOGE(GATTS_TAG,"%s init bluedroid failed\n", __func__);
     }
 
     ///register the callback function to the gap module

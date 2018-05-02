@@ -18,10 +18,13 @@
 #include "esp_bt_defs.h"
 #include "esp_gatt_defs.h"
 #include "esp_err.h"
+#include "esp_log.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define LOG_TAG "HIDD"
 
 typedef enum {
     ESP_HIDD_EVENT_REG_FINISH = 0,                     

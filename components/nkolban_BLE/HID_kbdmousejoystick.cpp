@@ -48,10 +48,26 @@ QueueHandle_t joystick_q;
 QueueHandle_t keyboard_q;
 QueueHandle_t mouse_q;
 
+//configure the reports & tasks:
+
+#define USE_MOUSE
+///note: if you use joystick, you MUST use mouse (otherwise: compile error)
+#define USE_JOYSTICK
+
+//test defines for valid config
+#if defined(USE_JOYSTICK) && !defined(USE_MOUSE)
+  #error "Please adjust the reportMap, if you want to use joystick but no mouse"
+#endif
+
 static BLEHIDDevice* hid;
+BLEServer *pServer;
 BLECharacteristic* inputKbd;
+#ifdef USE_MOUSE
 BLECharacteristic* inputMouse;
+#endif
+#ifdef USE_JOYSTICK
 BLECharacteristic* inputJoystick;
+#endif
 BLECharacteristic* outputKbd;
 
 class kbdOutputCB : public BLECharacteristicCallbacks {
@@ -82,6 +98,9 @@ class KeyboardTask : public Task {
 		vTaskDelete(NULL);
 	}
 };
+KeyboardTask *kbd; //instance for this task
+
+#ifdef USE_MOUSE
 class MouseTask : public Task {
 	void run(void*){
     uint8_t step = 0;
@@ -127,6 +146,9 @@ class MouseTask : public Task {
 		vTaskDelete(NULL);
 	}
 };
+MouseTask *mouse; //instance for this task
+#endif
+#ifdef USE_JOYSTICK
 class JoystickTask : public Task {
 	void run(void*){
     vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -139,23 +161,28 @@ class JoystickTask : public Task {
 		vTaskDelete(NULL);
 	}
 };
-
-KeyboardTask *kbd;
-MouseTask *mouse;
-JoystickTask *joystick;
-BLEServer *pServer;
+JoystickTask *joystick; //instance for this task
+#endif
 
 class CBs: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer){
    	kbd->start();
+    #ifdef USE_MOUSE
    	mouse->start();
+    #endif
+    #ifdef USE_JOYSTICK
    	joystick->start();
+    #endif
   }
 
   void onDisconnect(BLEServer* pServer){
     kbd->stop();
-    mouse->stop();
-    joystick->stop();
+    #ifdef USE_MOUSE
+   	mouse->stop();
+    #endif
+    #ifdef USE_JOYSTICK
+   	joystick->stop();
+    #endif
   }
 };
 
@@ -208,11 +235,14 @@ class BLE_HOG: public Task {
 
 		kbd = new KeyboardTask();
 		kbd->setStackSize(8096);
+    #ifdef USE_MOUSE
 		mouse = new MouseTask();
 		mouse->setStackSize(8096);
+    #endif
+    #ifdef USE_JOYSTICK
 		joystick = new JoystickTask();
 		joystick->setStackSize(8096);
-    
+    #endif
 		BLEDevice::init("FABI/FLipMouse");
 		pServer = BLEDevice::createServer();
 		pServer->setCallbacks(new CBs());
@@ -234,13 +264,15 @@ class BLE_HOG: public Task {
     /*
      * Initialize reports for mouse
      */
+    #ifdef USE_MOUSE
     inputMouse = hid->inputReport(2);
-    
+    #endif
     /*
      * Initialize reports for joystick
-     * /
+     */
+    #ifdef USE_JOYSTICK
     inputJoystick = hid->inputReport(3);
-    */
+    #endif
 		/*
 		 * Set manufacturer name
 		 * https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.manufacturer_name_string.xml
@@ -329,7 +361,7 @@ class BLE_HOG: public Task {
 			END_COLLECTION(0)
 		};
 		/*
-		 * Keyboard + mouse (+ joystick [tbd] )
+		 * Keyboard + mouse + joystick
 		 */
 		const uint8_t reportMap[] = {
       /*++++ Keyboard - report id 1 ++++*/
@@ -367,7 +399,10 @@ class BLE_HOG: public Task {
         USAGE_MINIMUM(1),   0x00,
         USAGE_MAXIMUM(1),   0x65,
         INPUT(1),           0x00,       //   Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position
-			END_COLLECTION(0),
+			#ifndef USE_MOUSE
+			END_COLLECTION(0)
+      #else
+      END_COLLECTION(0),
       /*++++ Mouse - report id 2 ++++*/
       USAGE_PAGE(1), 			0x01,
 			USAGE(1), 				  0x02,
@@ -389,17 +424,67 @@ class BLE_HOG: public Task {
           REPORT_SIZE(1),		  0x5,
           INPUT(1), 				  0x1,		//(Constant), ;5 bit padding
           USAGE_PAGE(1), 		  0x1,		//(Generic Desktop),
-          USAGE(1),				    0x30,
-          USAGE(1),				    0x31,
+          USAGE(1),				    0x30,   //X
+          USAGE(1),				    0x31,   //Y
+          USAGE(1),				    0x38,   //wheel
           LOGICAL_MINIMUM(1),	0x81,
           LOGICAL_MAXIMUM(1),	0x7f,
           REPORT_SIZE(1),	  	0x8,
-          REPORT_COUNT(1),		0x2,
-          INPUT(1), 				  0x6,		//(Data, Variable, Relative), ;2 position bytes (X & Y)
+          REPORT_COUNT(1),		0x03,   //3 bytes: X/Y/wheel
+          INPUT(1), 				  0x6,		//(Data, Variable, Relative), ;3 position bytes (X & Y & wheel)
         END_COLLECTION(0),
+      #endif
+      #if !defined(USE_JOYSTICK) && defined(USE_MOUSE)
 			END_COLLECTION(0)
+      #endif
+      
+      #ifdef USE_JOYSTICK
+      END_COLLECTION(0),
       /*++++ Joystick - report id 3 ++++*/
-      //TBD
+      USAGE_PAGE(1), 			0x01,
+			USAGE(1), 				  0x04,
+      COLLECTION(1),			0x01,
+        REPORT_ID(1),       0x03,
+        LOGICAL_MINIMUM(1), 0x00,
+        LOGICAL_MAXIMUM(1), 0x01,
+        REPORT_COUNT(1),		0x20, /* 32 */
+        REPORT_SIZE(1),	  	0x01,
+        USAGE_PAGE(1),      0x09,
+        USAGE_MINIMUM(1),   0x01,
+        USAGE_MAXIMUM(1),   0x20, /* 32 */
+        INPUT(1),           0x02, // variable | absolute
+        LOGICAL_MINIMUM(1), 0x00,
+        LOGICAL_MAXIMUM(1), 0x07,
+        PHYSICAL_MINIMUM(1),0x01,
+        PHYSICAL_MAXIMUM(2),(315 & 0xFF), ((315>>8) & 0xFF),
+        REPORT_SIZE(1),	  	0x04,
+        REPORT_COUNT(1),	  0x01,
+        UNIT(1),            20,
+        USAGE_PAGE(1), 			0x01,
+        USAGE(1), 				  0x39,  //hat switch
+        INPUT(1),           0x42, //variable | absolute | null state
+        USAGE_PAGE(1), 			0x01,
+        USAGE(1), 				  0x01,  //generic pointer
+        COLLECTION(1),      0x00,
+          LOGICAL_MINIMUM(1), 0x00,
+          LOGICAL_MAXIMUM(4), (1023 & 0xFF), ((1023>>8) & 0xFF), ((1023>>16) & 0xFF), ((1023>>24) & 0xFF),
+          REPORT_COUNT(1),		0x04,
+          REPORT_SIZE(1),	  	0x0A, /* 10 */
+          USAGE(1), 				  0x30,  // X axis
+          USAGE(1), 				  0x31,  // Y axis
+          USAGE(1), 				  0x32,  // Z axis
+          USAGE(1), 				  0x35,  // Z-rotator axis
+          INPUT(1),           0x02, // variable | absolute
+        END_COLLECTION(0),
+        LOGICAL_MINIMUM(1), 0x00,
+        LOGICAL_MAXIMUM(4), (1023 & 0xFF), ((1023>>8) & 0xFF), ((1023>>16) & 0xFF), ((1023>>24) & 0xFF),
+        REPORT_COUNT(1),		0x02,
+        REPORT_SIZE(1),	  	0x0A, /* 10 */
+        USAGE(1), 				  0x36,  // generic slider
+        USAGE(1), 				  0x36,  // generic slider
+        INPUT(1),           0x02, // variable | absolute
+      END_COLLECTION(0)
+      #endif
 		};
 		/*
 		 * Set report map (here is initialized device driver on client side)

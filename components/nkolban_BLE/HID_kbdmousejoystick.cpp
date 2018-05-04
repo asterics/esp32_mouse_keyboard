@@ -49,6 +49,17 @@ QueueHandle_t keyboard_q;
 QueueHandle_t mouse_q;
 
 static BLEHIDDevice* hid;
+BLECharacteristic* inputKbd;
+BLECharacteristic* inputMouse;
+BLECharacteristic* inputJoystick;
+BLECharacteristic* outputKbd;
+
+class kbdOutputCB : public BLECharacteristicCallbacks {
+	void onWrite(BLECharacteristic* me){
+		uint8_t* value = (uint8_t*)(me->getValue().c_str());
+		ESP_LOGI(LOG_TAG, "special keys: %d", *value);
+	}
+};
 
 class KeyboardTask : public Task {
 	void run(void*){
@@ -57,18 +68,17 @@ class KeyboardTask : public Task {
 		while(*hello){
 			KEYMAP map = keymap[(uint8_t)*hello];
 			uint8_t a[] = {map.modifier, 0x0, map.usage, 0x0,0x0,0x0,0x0,0x0};
-      BLECharacteristic* test = hid->inputReport(NULL);
-      test->setValue(a,sizeof(a));
+      inputKbd->setValue(a,sizeof(a));
       //test->executeCreate(hid->hidService());
-      test->notify();
+      inputKbd->notify();
 			//hid->inputReport(NULL)->setValue(a,sizeof(a));
 			//hid->inputReport(NULL)->notify();
 
 			hello++;
 		}
 			uint8_t v[] = {0x0, 0x0, 0x0, 0x0,0x0,0x0,0x0,0x0};
-			hid->inputReport(NULL)->setValue(v, sizeof(v));
-			hid->inputReport(NULL)->notify();
+			inputKbd->setValue(v, sizeof(v));
+			inputKbd->notify();
 		vTaskDelete(NULL);
 	}
 };
@@ -106,14 +116,14 @@ class MouseTask : public Task {
       }
       ESP_LOGI(LOG_TAG,"Sending mouse report: ");
       ESP_LOG_BUFFER_HEXDUMP(LOG_TAG,a,sizeof(a),ESP_LOG_INFO);
-			hid->inputReport(NULL)->setValue(a,sizeof(a));
-			hid->inputReport(NULL)->notify();
+			inputMouse->setValue(a,sizeof(a));
+			inputMouse->notify();
       vTaskDelay(2000/portTICK_PERIOD_MS);
 		}
     //finally: send an empty report
     uint8_t v[] = {0x0,(uint8_t) -0, (uint8_t) -0};
-    hid->inputReport(NULL)->setValue(v, sizeof(v));
-		hid->inputReport(NULL)->notify();
+    inputMouse->setValue(v, sizeof(v));
+		inputMouse->notify();
 		vTaskDelete(NULL);
 	}
 };
@@ -124,8 +134,8 @@ class JoystickTask : public Task {
         vTaskDelay(10000/portTICK_PERIOD_MS);
 		}
 			/*uint8_t v[] = {0x0, 0x0, 0x0, 0x0,0x0,0x0,0x0,0x0};
-			hid->inputReport(NULL)->setValue(v, sizeof(v));
-			hid->inputReport(NULL)->notify();*/
+			inputJoystick->setValue(v, sizeof(v));
+			inputJoystick->notify();*/
 		vTaskDelete(NULL);
 	}
 };
@@ -206,14 +216,31 @@ class BLE_HOG: public Task {
 		BLEDevice::init("FABI/FLipMouse");
 		pServer = BLEDevice::createServer();
 		pServer->setCallbacks(new CBs());
-		BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_NO_MITM);
-		BLEDevice::setSecurityCallbacks(new CB_Security());
+		//BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_NO_MITM);
+		//BLEDevice::setSecurityCallbacks(new CB_Security());
 
 		/*
 		 * Instantiate hid device
 		 */
 		hid = new BLEHIDDevice(pServer);
-
+    
+    /*
+     * Initialize reports for keyboard
+     */
+    inputKbd = hid->inputReport(1);
+    outputKbd = hid->outputReport(1);
+    outputKbd->setCallbacks(new kbdOutputCB());
+    
+    /*
+     * Initialize reports for mouse
+     */
+    inputMouse = hid->inputReport(2);
+    
+    /*
+     * Initialize reports for joystick
+     * /
+    inputJoystick = hid->inputReport(3);
+    */
 		/*
 		 * Set manufacturer name
 		 * https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.manufacturer_name_string.xml
@@ -225,9 +252,7 @@ class BLE_HOG: public Task {
 		 * Set pnp parameters
 		 * https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.pnp_id.xml
 		 */
-		const uint8_t pnp[] = {0x01,0x02,0xe5,0xab,0xcd,0x01,0x10};
-    //hid->pnp(0x01,0x02E5,0xABCD,0x0110);
-		//hid->pnp()->setValue((uint8_t*)pnp, sizeof(pnp));
+    hid->pnp(0x01,0xE502,0xA111,0x0210);
 
 		/*
 		 * Set hid informations
@@ -235,12 +260,12 @@ class BLE_HOG: public Task {
 		 */
 		//const uint8_t val1[] = {0x01,0x11,0x00,0x03};
 		//hid->hidInfo()->setValue((uint8_t*)val1, 4);
-    hid->hidInfo(0x00,0x03);
+    hid->hidInfo(0x00,0x01);
 
 		/*
 		 * Mouse
 		 */
-		const uint8_t reportMap2[] = {
+		const uint8_t reportMapMouse[] = {
 			USAGE_PAGE(1), 			0x01,
 			USAGE(1), 				0x02,
 			 COLLECTION(1),			0x01,
@@ -373,13 +398,15 @@ class BLE_HOG: public Task {
           INPUT(1), 				  0x6,		//(Data, Variable, Relative), ;2 position bytes (X & Y)
         END_COLLECTION(0),
 			END_COLLECTION(0)
+      /*++++ Joystick - report id 3 ++++*/
+      //TBD
 		};
 		/*
 		 * Set report map (here is initialized device driver on client side)
 		 * https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.report_map.xml
 		 */
-		//hid->setReportMap((uint8_t*)reportMap, sizeof(reportMap));
-		hid->reportMap((uint8_t*)reportMapKbd, sizeof(reportMapKbd));
+		hid->reportMap((uint8_t*)reportMap, sizeof(reportMap));
+		//hid->reportMap((uint8_t*)reportMapKbd, sizeof(reportMapKbd));
 
 		/*
 		 * We are prepared to start hid device services. Before this point we can change all values and/or set parameters we need.
@@ -401,7 +428,7 @@ class BLE_HOG: public Task {
 		BLESecurity *pSecurity = new BLESecurity();
 		pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
 		pSecurity->setCapability(ESP_IO_CAP_NONE);
-		pSecurity->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+		//pSecurity->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
 
 		ESP_LOGD(LOG_TAG, "Advertising started!");
     while(1) { delay(1000000); }

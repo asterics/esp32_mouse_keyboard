@@ -166,11 +166,21 @@ JoystickTask *joystick; //instance for this task
 
 class CBs: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer){
+    BLE2902* desc;
+    
+    //enable notifications for input service, suggested by chegewara to support iOS
+    //https://github.com/asterics/esp32_mouse_keyboard/issues/4#issuecomment-386558158
+    desc = (BLE2902*) inputKbd->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(true);
    	kbd->start();
     #ifdef USE_MOUSE
+    desc = (BLE2902*) inputMouse->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(true);
    	mouse->start();
     #endif
     #ifdef USE_JOYSTICK
+    desc = (BLE2902*) inputJoystick->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(true);
    	joystick->start();
     #endif
   }
@@ -294,72 +304,6 @@ class BLE_HOG: public Task {
 		//hid->hidInfo()->setValue((uint8_t*)val1, 4);
     hid->hidInfo(0x00,0x01);
 
-		/*
-		 * Mouse
-		 */
-		const uint8_t reportMapMouse[] = {
-			USAGE_PAGE(1), 			0x01,
-			USAGE(1), 				0x02,
-			 COLLECTION(1),			0x01,
-			 USAGE(1),				0x01,
-			 COLLECTION(1),			0x00,
-			 USAGE_PAGE(1),			0x09,
-			 USAGE_MINIMUM(1),		0x1,
-			 USAGE_MAXIMUM(1),		0x3,
-			 LOGICAL_MINIMUM(1),	0x0,
-			 LOGICAL_MAXIMUM(1),	0x1,
-			 REPORT_COUNT(1),		0x3,
-			 REPORT_SIZE(1),		0x1,
-			 INPUT(1), 				0x2,		// (Data, Variable, Absolute), ;3 button bits
-			 REPORT_COUNT(1),		0x1,
-			 REPORT_SIZE(1),		0x5,
-			 INPUT(1), 				0x1,		//(Constant), ;5 bit padding
-			 USAGE_PAGE(1), 		0x1,		//(Generic Desktop),
-			 USAGE(1),				0x30,
-			 USAGE(1),				0x31,
-			 LOGICAL_MINIMUM(1),	0x81,
-			 LOGICAL_MAXIMUM(1),	0x7f,
-			 REPORT_SIZE(1),		0x8,
-			 REPORT_COUNT(1),		0x2,
-			 INPUT(1), 				0x6,		//(Data, Variable, Relative), ;2 position bytes (X & Y)
-			 END_COLLECTION(0),
-			END_COLLECTION(0)
-		};
-    
-    const uint8_t reportMapKbd[] = {
-			USAGE_PAGE(1),      0x01,       // Generic Desktop Ctrls
-			USAGE(1),           0x06,       // Keyboard
-			COLLECTION(1),      0x01,       // Application
-			USAGE_PAGE(1),      0x07,       //   Kbrd/Keypad
-			USAGE_MINIMUM(1),   0xE0,
-			USAGE_MAXIMUM(1),   0xE7,
-			LOGICAL_MINIMUM(1), 0x00,
-			LOGICAL_MAXIMUM(1), 0x01,
-			REPORT_SIZE(1),     0x01,       //   1 byte (Modifier)
-			REPORT_COUNT(1),    0x08,
-			INPUT(1),           0x02,       //   Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position
-			REPORT_COUNT(1),    0x01,       //   1 byte (Reserved)
-			REPORT_SIZE(1),     0x08,
-			INPUT(1),           0x01,       //   Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position
-			REPORT_COUNT(1),    0x05,       //   5 bits (Num lock, Caps lock, Scroll lock, Compose, Kana)
-			REPORT_SIZE(1),     0x01,
-			USAGE_PAGE(1),      0x08,       //   LEDs
-			USAGE_MINIMUM(1),   0x01,       //   Num Lock
-			USAGE_MAXIMUM(1),   0x05,       //   Kana
-			OUTPUT(1),          0x02,       //   Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile
-			REPORT_COUNT(1),    0x01,       //   3 bits (Padding)
-			REPORT_SIZE(1),     0x03,
-			OUTPUT(1),          0x01,       //   Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile
-			REPORT_COUNT(1),    0x06,       //   6 bytes (Keys)
-			REPORT_SIZE(1),     0x08,
-			LOGICAL_MINIMUM(1), 0x00,
-			LOGICAL_MAXIMUM(1), 0x65,       //   101 keys
-			USAGE_PAGE(1),      0x07,       //   Kbrd/Keypad
-			USAGE_MINIMUM(1),   0x00,
-			USAGE_MAXIMUM(1),   0x65,
-			INPUT(1),           0x00,       //   Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position
-			END_COLLECTION(0)
-		};
 		/*
 		 * Keyboard + mouse + joystick
 		 */

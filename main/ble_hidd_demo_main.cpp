@@ -1,19 +1,22 @@
-// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ * 
+ * Copyright 2017 Benjamin Aigner <beni@asterics-foundation.org>
+ */
 
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-// Adaptions done:
-// Copyright 2017 Benjamin Aigner <beni@asterics-foundation.org>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +32,9 @@
 #include "esp_bt.h"
 
 #include "config.h"
+#include "HID_kbdmousejoystick.h"
 
-#include "esp_hidd_prf_api.h"
+//#include "esp_hidd_prf_api.h"
 #include "esp_bt_defs.h"
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
@@ -39,7 +43,7 @@
 #include "esp_bt_device.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
-#include "hid_dev.h"
+//#include "hid_dev.h"
 #include "keyboard.h"
 
 #define GATTS_TAG "FABI/FLIPMOUSE"
@@ -52,10 +56,9 @@ static uint8_t keycode_arr[6];
 //static joystick_data_t joystick;//currently unused, no joystick implemented
 static config_data_t config;
 
-
 #define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
 
-static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
+//static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
 
 const char hid_device_name_fabi[] = "FABI";
 const char hid_device_name_flipmouse[] = "FLipMouse";
@@ -64,7 +67,7 @@ static uint8_t hidd_service_uuid128[] = {
     //first uuid, 16bit, [12],[13] is the value
     0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x12, 0x18, 0x00, 0x00,
 };
-
+#if 0
 static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
@@ -91,7 +94,7 @@ static esp_ble_adv_params_t hidd_adv_params = {
     .channel_map        = ADV_CHNL_ALL,
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
-
+#endif
 /*
 void IRAM_ATTR gpio_isr_handler(void* arg)
 {
@@ -162,7 +165,7 @@ static void gpio_demo_init(void)
 }*/
 
 
-
+#if 0
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param)
 {
     switch(event) {
@@ -181,6 +184,9 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
             break;
         }
         case ESP_BAT_EVENT_REG: {
+            break;
+        }
+        case ESP_DEV_EVENT_REG: {
             break;
         }
         case ESP_HIDD_EVENT_DEINIT_FINISH:
@@ -634,10 +640,16 @@ void uart_stdin(void *pvParameters)
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
+#endif
 
-
-void app_main()
+extern "C" void app_main()
 {
+
+    ESP_LOGE("HIDD","MAIN reached...");
+    HID_kbdmousejoystick_init();
+    ESP_LOGE("HIDD","MAIN finished...");
+    vTaskDelete(NULL);
+    #if 0
     esp_err_t ret;
 
     // Initialize NVS.
@@ -729,7 +741,9 @@ void app_main()
     //init the gpio pin (not needing GPIOs by now...)
     //gpio_demo_init();
     
+   
     xTaskCreate(&uart_stdin, "stdin", 2048, NULL, 5, NULL);
+    #endif
 
 }
 

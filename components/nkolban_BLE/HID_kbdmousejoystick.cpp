@@ -52,7 +52,7 @@ QueueHandle_t mouse_q;
 
 #define USE_MOUSE
 ///note: if you use joystick, you MUST use mouse (otherwise: compile error)
-#define USE_JOYSTICK
+//#define USE_JOYSTICK
 
 //test defines for valid config
 #if defined(USE_JOYSTICK) && !defined(USE_MOUSE)
@@ -84,15 +84,19 @@ class KeyboardTask : public Task {
 		while(*hello){
 			KEYMAP map = keymap[(uint8_t)*hello];
 			uint8_t a[] = {map.modifier, 0x0, map.usage, 0x0,0x0,0x0,0x0,0x0};
+      ESP_LOGI(LOG_TAG,"Kbd: %c, keycode: 0x%2X, modifier: 0x%2X",hello[0],map.usage,map.modifier);
       inputKbd->setValue(a,sizeof(a));
       //test->executeCreate(hid->hidService());
       inputKbd->notify();
-			//hid->inputReport(NULL)->setValue(a,sizeof(a));
-			//hid->inputReport(NULL)->notify();
+      uint8_t b[] = {0x0, 0x0, 0x00, 0x0,0x0,0x0,0x0,0x0};
+			inputKbd->setValue(b,sizeof(b));
+			inputKbd->notify();
 
 			hello++;
+      
+      vTaskDelay(2);
 		}
-			uint8_t v[] = {0x0, 0x0, 0x0, 0x0,0x0,0x0,0x0,0x0};
+			uint8_t v[] = {0x00, 0x0, 0x0, 0x0,0x0,0x0,0x0,0x0};
 			inputKbd->setValue(v, sizeof(v));
 			inputKbd->notify();
 		vTaskDelete(NULL);
@@ -105,31 +109,33 @@ class MouseTask : public Task {
 	void run(void*){
     uint8_t step = 0;
     //<report id = 2>, <button>, <x>, <y>
-    uint8_t a[] = {0x00,(uint8_t) -0, (uint8_t) -0};
-    vTaskDelay(5000/portTICK_PERIOD_MS);
+    uint8_t a[] = {0x00,(uint8_t) -0, (uint8_t) -0,(uint8_t)-0};
+    vTaskDelay(10000/portTICK_PERIOD_MS);
 		while(1){
       //disabled until at least kbd works...
-      vTaskDelay(500000/portTICK_PERIOD_MS);
+      //vTaskDelay(500000/portTICK_PERIOD_MS);
       switch(step) {
         case 0:
           a[0] = 0;
-          a[1] = 10;
+          a[1] = 50;
           step++;
           break;
         case 1:
-          a[1] = -10;
+          a[1] = -50;
           step++;
           break;
         case 2:
-          a[2] = 10;
+          a[2] = 50;
           step++;
           break;
         case 3:
           step++;
-          a[2] = -10;
+          a[2] = -50;
           break;
         default:
           a[0] = (1<<0);
+          a[1] = 0;
+          a[2] = 0;
           step = 0;
           break;
       }
@@ -168,7 +174,7 @@ class CBs: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer){
     BLE2902* desc;
     
-    //enable notifications for input service, suggested by chegewara to support iOS
+    //enable notifications for input service, suggested by chegewara to support iOS/Win10
     //https://github.com/asterics/esp32_mouse_keyboard/issues/4#issuecomment-386558158
     desc = (BLE2902*) inputKbd->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
     desc->setNotifications(true);
@@ -186,12 +192,12 @@ class CBs: public BLEServerCallbacks {
   }
 
   void onDisconnect(BLEServer* pServer){
-    kbd->stop();
+    //kbd->stop();
     #ifdef USE_MOUSE
-   	mouse->stop();
+   	//mouse->stop();
     #endif
     #ifdef USE_JOYSTICK
-   	joystick->stop();
+   	//joystick->stop();
     #endif
   }
 };
@@ -257,7 +263,7 @@ class BLE_HOG: public Task {
 		pServer = BLEDevice::createServer();
 		pServer->setCallbacks(new CBs());
 		//BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_NO_MITM);
-		//BLEDevice::setSecurityCallbacks(new CB_Security());
+		BLEDevice::setSecurityCallbacks(new CB_Security());
 
 		/*
 		 * Instantiate hid device
@@ -294,7 +300,8 @@ class BLE_HOG: public Task {
 		 * Set pnp parameters
 		 * https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.pnp_id.xml
 		 */
-    hid->pnp(0x01,0xE502,0xA111,0x0210);
+    //hid->pnp(0x01,0xE502,0xA111,0x0210); //BT SIG assigned VID
+    hid->pnp(0x02,0xE502,0xA111,0x0210); //USB assigned VID
 
 		/*
 		 * Set hid informations
@@ -313,6 +320,42 @@ class BLE_HOG: public Task {
 			USAGE(1),           0x06,       // Keyboard
 			COLLECTION(1),      0x01,       // Application
         REPORT_ID(1),       0x01,
+        
+        #if 1
+        //report equal to usb_bridge
+        REPORT_SIZE(1),     0x01,
+        REPORT_COUNT(1),    0x08,
+        USAGE_PAGE(1),      0x07,       //   Kbrd/Keypad
+        USAGE_MINIMUM(1),   0xE0,
+        USAGE_MAXIMUM(1),   0xE7,
+        LOGICAL_MINIMUM(1), 0x00,
+        LOGICAL_MAXIMUM(1), 0x01,
+        INPUT(1),           0x02,       //   Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position
+        REPORT_COUNT(1),    0x01,
+        REPORT_SIZE(1),     0x08,
+        INPUT(1),           0x03,
+        REPORT_COUNT(1),    0x05,
+        REPORT_SIZE(1),     0x01,
+        USAGE_PAGE(1),      0x08,       //   LEDs
+        USAGE_MINIMUM(1),   0x01,       //   Num Lock
+        USAGE_MAXIMUM(1),   0x05,       //   Kana
+        OUTPUT(1),          0x02,       //   Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile
+        REPORT_COUNT(1),    0x01,       //   3 bits (Padding)
+        REPORT_SIZE(1),     0x03,
+        OUTPUT(1),          0x03,
+        REPORT_COUNT(1),    0x06,       //   6 bytes (Keys)
+        REPORT_SIZE(1),     0x08,
+        LOGICAL_MINIMUM(1), 0x00,
+        LOGICAL_MAXIMUM(1), 104,       //   104 keys
+        USAGE_PAGE(1),      0x07,       //   Kbrd/Keypad
+        USAGE_MINIMUM(1),   0x00,       //   Num Lock
+        USAGE_MAXIMUM(1),   104,       //   Kana
+        INPUT(1),           0x00,
+        #endif
+        
+        
+        //report by nkolban / chegewara
+        #if 0
         REPORT_COUNT(1),    0x08,
         REPORT_SIZE(1),     0x01,
         USAGE_PAGE(1),      0x07,       //   Kbrd/Keypad
@@ -343,6 +386,9 @@ class BLE_HOG: public Task {
         USAGE_MINIMUM(1),   0x00,
         USAGE_MAXIMUM(1),   0x65,
         INPUT(1),           0x00,       //   Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position
+        #endif
+        
+        
 			#ifndef USE_MOUSE
 			END_COLLECTION(0)
       #else
@@ -352,21 +398,22 @@ class BLE_HOG: public Task {
 			USAGE(1), 				  0x02,
       COLLECTION(1),			0x01,
         REPORT_ID(1),       0x02,
-        REPORT_COUNT(1),    0x08,
-        REPORT_SIZE(1),     0x01,
+        //REPORT_COUNT(1),    0x08,
+        //REPORT_SIZE(1),     0x01,
         USAGE(1),				    0x01,
         COLLECTION(1),			0x00,
           USAGE_PAGE(1),			0x09,
           USAGE_MINIMUM(1),		0x1,
-          USAGE_MAXIMUM(1),		0x3,
+          //USAGE_MAXIMUM(1),		0x3,
+          USAGE_MAXIMUM(1),		0x8,
           LOGICAL_MINIMUM(1),	0x0,
           LOGICAL_MAXIMUM(1),	0x1,
-          REPORT_COUNT(1),		0x3,
+          REPORT_COUNT(1),		0x8,
           REPORT_SIZE(1),	  	0x1,
-          INPUT(1), 				  0x2,		// (Data, Variable, Absolute), ;3 button bits
-          REPORT_COUNT(1),		0x1,
-          REPORT_SIZE(1),		  0x5,
-          INPUT(1), 				  0x1,		//(Constant), ;5 bit padding
+          INPUT(1), 				  0x2,		// (Data, Variable, Absolute), ;8 button bits
+          //REPORT_COUNT(1),		0x1,
+          //REPORT_SIZE(1),		  0x5,
+          //INPUT(1), 				  0x1,		//(Constant), ;5 bit padding
           USAGE_PAGE(1), 		  0x1,		//(Generic Desktop),
           USAGE(1),				    0x30,   //X
           USAGE(1),				    0x31,   //Y
@@ -448,18 +495,19 @@ class BLE_HOG: public Task {
 		 * Its good to setup advertising by providing appearance and advertised service. This will let clients find our device by type
 		 */
 		BLEAdvertising *pAdvertising = pServer->getAdvertising();
-		pAdvertising->setAppearance(HID_KEYBOARD);
-		//pAdvertising->setAppearance(GENERIC_HID);
+		//pAdvertising->setAppearance(HID_KEYBOARD);
+		pAdvertising->setAppearance(GENERIC_HID);
 		pAdvertising->addServiceUUID(hid->hidService()->getUUID());
 		pAdvertising->start();
 
 
 		BLESecurity *pSecurity = new BLESecurity();
 		pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
-		pSecurity->setCapability(ESP_IO_CAP_NONE);
+		//pSecurity->setCapability(ESP_IO_CAP_NONE);
+		pSecurity->setCapability(ESP_IO_CAP_OUT);
 		//pSecurity->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
 
-		ESP_LOGD(LOG_TAG, "Advertising started!");
+		ESP_LOGI(LOG_TAG, "Advertising started!");
     while(1) { delay(1000000); }
 	}
 };

@@ -26,6 +26,10 @@
 #ifndef _KEYBOARD_H_
 #define _KEYBOARD_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,6 +117,10 @@ uint16_t get_cpoint(uint16_t cpoint,uint8_t locale_src,uint8_t locale_dst);
  * @param locale Locale number, as defined in keyboard_layouts
  **/
 uint8_t get_hid_country_code(uint8_t locale);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
  

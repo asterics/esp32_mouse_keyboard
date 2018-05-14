@@ -39,6 +39,7 @@ extern "C" {
 #include <freertos/event_groups.h>
 #include <freertos/queue.h>
 #include <esp_log.h>
+#include <keyboard.h>
 
 /** @brief Queue for sending mouse reports
  * @see mouse_command_t */
@@ -54,8 +55,22 @@ extern QueueHandle_t joystick_q;
 
 /** @brief Main init function to start HID interface
  * 
+ * @param enableKeyboard If != 0, keyboard will be active
+ * @param enableMouse If != 0, mouse will be active
+ * @param enableJoystick If != 0, joystick will be active
+ * @param testmode If set to 0, HID data is only sent if something is put
+ * to the queue. If set != 0, keyboard/mouse/joystick will send test data.
  * @note After init, just use the queues! */
-esp_err_t HID_kbdmousejoystick_init(void);
+esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse, uint8_t enableJoystick, uint8_t testmode);
+
+/** @brief Activate pairing, disconnect from paired device
+ * */
+esp_err_t HID_kbdmousejoystick_activatePairing(void);
+
+/** @brief Is the BLE currently connected?
+ * @return 0 if not connected, 1 if connected */  
+uint8_t HID_kbdmousejoystick_isConnected(void);
+
 
 /** @brief One mouse command (report) to be sent via BLE mouse profile
  * @see mouse_q */
@@ -107,7 +122,7 @@ typedef struct keyboard_command {
   /** list of keycodes+modfiers to be pressed/released.
    * @note Low byte contains the keycode, high byte any modifiers
    * */
-  uint16_t keycodes;
+  uint16_t keycode;
 } keyboard_command_t;
 
 #ifdef __cplusplus

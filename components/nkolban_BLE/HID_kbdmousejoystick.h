@@ -67,6 +67,24 @@ esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse,
  * */
 esp_err_t HID_kbdmousejoystick_activatePairing(void);
 
+/** @brief Directly send a HID keyboard report
+ * 
+ * @param a Pointer to report buffer
+ * @param len Size of report buffer
+ * @note Buffer lenght must equal 8 Bytes!
+ * @note 1st Byte is modifier, 2nd is empty, 3 to 8 are keycodes
+ * */
+esp_err_t HID_kbdmousejoystick_rawKeyboard(uint8_t *a, uint8_t len);
+
+/** @brief Directly send a HID mouse report
+ * 
+ * @param a Pointer to report buffer
+ * @param len Size of report buffer
+ * @note Buffer lenght must equal 4 Bytes!
+ * @note 1st Byte is button mask, 2nd/3rd are X/Y, 4th is wheel
+ * */
+esp_err_t HID_kbdmousejoystick_rawMouse(uint8_t *a, uint8_t len);
+
 /** @brief Is the BLE currently connected?
  * @return 0 if not connected, 1 if connected */  
 uint8_t HID_kbdmousejoystick_isConnected(void);
@@ -111,7 +129,8 @@ typedef struct joystick_command {
 typedef enum {
   PRESS,
   RELEASE,
-  PRESS_RELEASE
+  PRESS_RELEASE,
+  RELEASE_ALL
 } keyboard_action;
 
 /** @brief One command (report) to be issued via BLE keyboard profile

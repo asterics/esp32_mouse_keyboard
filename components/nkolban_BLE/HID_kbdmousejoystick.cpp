@@ -275,6 +275,8 @@ class KeyboardTask : public Task {
             case RELEASE:
               remove_keycode(cmd.keycode & 0xFF,&a[2]);
               break;
+            case RELEASE_ALL:
+              memset(a,0,8);
             default:
               ESP_LOGE(LOG_TAG,"Unknown type of keyboard command");
               break;
@@ -431,7 +433,7 @@ class CBs: public BLEServerCallbacks {
   }
 };
 
-uint32_t passKey = 0;
+uint32_t passKey = 1307;
 /** @brief security callback
  * 
  * This class is passed to the BLEServer as callbacks for security
@@ -636,14 +638,18 @@ class BLE_HOG: public Task {
 		BLEAdvertising *pAdvertising = pServer->getAdvertising();
 		//pAdvertising->setAppearance(HID_KEYBOARD);
 		pAdvertising->setAppearance(GENERIC_HID);
+    pAdvertising->setMinInterval(400); //250ms minimum
+    pAdvertising->setMaxInterval(800); //500ms maximum
 		pAdvertising->addServiceUUID(hid->hidService()->getUUID());
 		pAdvertising->start();
+    
 
 
 		BLESecurity *pSecurity = new BLESecurity();
 		pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
-		//pSecurity->setCapability(ESP_IO_CAP_NONE);
-		pSecurity->setCapability(ESP_IO_CAP_OUT);
+		pSecurity->setCapability(ESP_IO_CAP_NONE);
+		//pSecurity->setCapability(ESP_IO_CAP_OUT);
+		//pSecurity->setCapability(ESP_IO_CAP_KBDISP);
 		//pSecurity->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
 
 		ESP_LOGI(LOG_TAG, "Advertising started!");
@@ -654,6 +660,37 @@ class BLE_HOG: public Task {
 
 extern "C" {
   
+    
+  /** @brief Directly send a HID keyboard report
+   * 
+   * @param a Pointer to report buffer
+   * @param len Size of report buffer
+   * @note Buffer lenght must equal 8 Bytes!
+   * @note 1st Byte is modifier, 2nd is empty, 3 to 8 are keycodes
+   * */
+  esp_err_t HID_kbdmousejoystick_rawKeyboard(uint8_t *a, uint8_t len)
+  {
+    if(len != 8 || a == nullptr) return ESP_FAIL;
+    inputKbd->setValue(a,len);
+    inputKbd->notify();
+    return ESP_OK;
+  }
+  
+  /** @brief Directly send a HID mouse report
+   * 
+   * @param a Pointer to report buffer
+   * @param len Size of report buffer
+   * @note Buffer lenght must equal 4 Bytes!
+   * @note 1st Byte is button mask, 2nd/3rd are X/Y, 4th is wheel
+   * */
+  esp_err_t HID_kbdmousejoystick_rawMouse(uint8_t *a, uint8_t len)
+  {
+    if(len != 4 || a == nullptr) return ESP_FAIL;
+    inputMouse->setValue(a,len);
+    inputMouse->notify();
+    return ESP_OK;
+  }
+    
   esp_err_t HID_kbdmousejoystick_activatePairing(void)
   {
     BLEAdvertising *pAdvertising = pServer->getAdvertising();

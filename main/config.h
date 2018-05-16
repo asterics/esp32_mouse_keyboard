@@ -6,7 +6,10 @@
 
 //TODO: change to external UART; currently set to serial port of monitor for debugging
 #define EX_UART_NUM UART_NUM_2
-#define CONSOLE_UART_NUM UART_NUM_0
+#define CONSOLE_UART_NUM UART_NUM_2
+
+#define EX_SERIAL_TXPIN      (GPIO_NUM_17)
+#define EX_SERIAL_RXPIN      (GPIO_NUM_16)
 
 typedef struct joystick_data {
     uint16_t X;

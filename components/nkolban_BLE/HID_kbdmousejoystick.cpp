@@ -430,6 +430,11 @@ class CBs: public BLEServerCallbacks {
       desc->setNotifications(false);
       joystick->stop();
     }
+    
+    //restart advertising
+    BLEAdvertising *pAdvertising = pServer->getAdvertising();
+    pAdvertising->start();
+    ESP_LOGI(LOG_TAG,"Client disconnected, restarting advertising");
   }
 };
 

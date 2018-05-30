@@ -42,6 +42,7 @@
 
 #include "sdkconfig.h"
 
+#define BT_DEVICENAME "FABI"
 static char LOG_TAG[] = "HAL_BLE";
 
 /// @brief Input queue for sending joystick reports
@@ -400,6 +401,7 @@ class CBs: public BLEServerCallbacks {
       desc->setNotifications(true);
       joystick->start();
     }
+    ESP_LOGI(LOG_TAG,"Client connected ! ");
   }
 
   void onDisconnect(BLEServer* pServer){
@@ -519,7 +521,7 @@ class BLE_HOG: public Task {
       joystick->setStackSize(8096);
     }
     
-		BLEDevice::init("FABI/FLipMouse");
+		BLEDevice::init(BT_DEVICENAME);
 		pServer = BLEDevice::createServer();
 		pServer->setCallbacks(new CBs());
 		//BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_NO_MITM);
@@ -651,7 +653,9 @@ class BLE_HOG: public Task {
 
 
 		BLESecurity *pSecurity = new BLESecurity();
-		pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
+//		pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
+		pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND );
+ 
 		pSecurity->setCapability(ESP_IO_CAP_NONE);
 		//pSecurity->setCapability(ESP_IO_CAP_OUT);
 		//pSecurity->setCapability(ESP_IO_CAP_KBDISP);
@@ -699,13 +703,21 @@ extern "C" {
   esp_err_t HID_kbdmousejoystick_activatePairing(void)
   {
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
-		//pAdvertising->setAppearance(HID_KEYBOARD);
-		pAdvertising->setAppearance(GENERIC_HID);
-		pAdvertising->addServiceUUID(hid->hidService()->getUUID());
-		pAdvertising->start();
+	pAdvertising->setAppearance(GENERIC_HID);
+	pAdvertising->addServiceUUID(hid->hidService()->getUUID());
+	pAdvertising->start();
     return ESP_OK;
   }
   
+  esp_err_t HID_kbdmousejoystick_deactivatePairing(void)
+  {
+    BLEAdvertising *pAdvertising = pServer->getAdvertising();
+	pAdvertising->setAppearance(GENERIC_HID);
+	pAdvertising->addServiceUUID(hid->hidService()->getUUID());
+	pAdvertising->stop();
+    return ESP_OK;
+  }
+
   uint8_t HID_kbdmousejoystick_isConnected(void)
   {
     return isConnected;

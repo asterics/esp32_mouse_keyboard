@@ -3,11 +3,13 @@
 #define _CONFIG_H_
 
 #define MODULE_ID "ESP32BT_v0.1"
+#define MAX_BT_DEVICENAME_LENGTH 40
 
-//TODO: change to external UART; currently set to serial port of monitor for debugging
+// serial port of monitor and for debugging
+#define CONSOLE_UART_NUM UART_NUM_0
+
+// serial port for connection to other controllers
 #define EX_UART_NUM UART_NUM_2
-#define CONSOLE_UART_NUM UART_NUM_2
-
 #define EX_SERIAL_TXPIN      (GPIO_NUM_17)
 #define EX_SERIAL_RXPIN      (GPIO_NUM_16)
 
@@ -24,7 +26,7 @@ typedef struct joystick_data {
 } joystick_data_t;
 
 typedef struct config_data {
-    uint8_t bt_device_name_index;
+    char bt_device_name[MAX_BT_DEVICENAME_LENGTH];
     uint8_t locale;
 } config_data_t;
 

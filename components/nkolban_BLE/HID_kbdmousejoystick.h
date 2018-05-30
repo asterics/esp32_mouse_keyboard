@@ -67,6 +67,10 @@ esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse,
  * */
 esp_err_t HID_kbdmousejoystick_activatePairing(void);
 
+/** @brief Deactivate pairing, disconnect from paired device
+ * */
+esp_err_t HID_kbdmousejoystick_deactivatePairing(void);
+
 /** @brief Directly send a HID keyboard report
  * 
  * @param a Pointer to report buffer

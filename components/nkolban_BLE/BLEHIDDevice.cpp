@@ -49,7 +49,9 @@ BLEHIDDevice::BLEHIDDevice(BLEServer* server) {
 	m_batteryLevelCharacteristic = m_batteryService->createCharacteristic((uint16_t)0x2a19, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
         m_batteryLevelCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
 	m_batteryLevelCharacteristic->addDescriptor(batteryLevelDescriptor);
-	m_batteryLevelCharacteristic->addDescriptor(new BLE2902());
+        BLE2902 *desc = new BLE2902();
+        desc->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+	m_batteryLevelCharacteristic->addDescriptor(desc);
 
 	/*
 	 * This value is setup here because its default value in most usage cases, its very rare to use boot mode
@@ -121,7 +123,10 @@ BLECharacteristic* BLEHIDDevice::inputReport(uint8_t reportID) {
 
 	uint8_t desc1_val[] = {reportID, 0x01};
 	inputReportDescriptor->setValue((uint8_t*)desc1_val, 2);
-	inputReportCharacteristic->addDescriptor(new BLE2902());
+        BLE2902 *desc = new BLE2902();
+        desc->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+        inputReportDescriptor->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
+	inputReportCharacteristic->addDescriptor(desc);
 	inputReportCharacteristic->addDescriptor(inputReportDescriptor);
 
 	return inputReportCharacteristic;
@@ -139,6 +144,7 @@ BLECharacteristic* BLEHIDDevice::outputReport(uint8_t reportID) {
 	uint8_t desc1_val[] = {reportID, 0x02};
 	outputReportDescriptor->setValue((uint8_t*)desc1_val, 2);
 	outputReportCharacteristic->addDescriptor(outputReportDescriptor);
+        outputReportDescriptor->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
 
 	return outputReportCharacteristic;
 }
@@ -155,6 +161,7 @@ BLECharacteristic* BLEHIDDevice::featureReport(uint8_t reportID) {
 	uint8_t desc1_val[] = {reportID, 0x03};
 	featureReportDescriptor->setValue((uint8_t*)desc1_val, 2);
 	featureReportCharacteristic->addDescriptor(featureReportDescriptor);
+        featureReportDescriptor->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
 
 	return featureReportCharacteristic;
 }
@@ -164,7 +171,9 @@ BLECharacteristic* BLEHIDDevice::featureReport(uint8_t reportID) {
  */
 BLECharacteristic* BLEHIDDevice::bootInput() {
 	BLECharacteristic* bootInputCharacteristic = m_hidService->createCharacteristic((uint16_t)0x2a22, BLECharacteristic::PROPERTY_NOTIFY);
-	bootInputCharacteristic->addDescriptor(new BLE2902());
+        BLE2902 *desc = new BLE2902();
+        desc->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+	bootInputCharacteristic->addDescriptor(desc);
 
 	return bootInputCharacteristic;
 }

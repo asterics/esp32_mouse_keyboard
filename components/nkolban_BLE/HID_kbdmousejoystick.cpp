@@ -654,7 +654,7 @@ class BLE_HOG: public Task {
 
 		BLESecurity *pSecurity = new BLESecurity();
 //		pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
-		pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND );
+		//pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND );
  
 		pSecurity->setCapability(ESP_IO_CAP_NONE);
 		//pSecurity->setCapability(ESP_IO_CAP_OUT);

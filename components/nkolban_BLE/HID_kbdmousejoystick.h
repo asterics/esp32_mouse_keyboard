@@ -61,7 +61,7 @@ extern QueueHandle_t joystick_q;
  * @param testmode If set to 0, HID data is only sent if something is put
  * to the queue. If set != 0, keyboard/mouse/joystick will send test data.
  * @note After init, just use the queues! */
-esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse, uint8_t enableJoystick, uint8_t testmode);
+esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse, uint8_t enableJoystick, uint8_t testmode, char * name);
 
 /** @brief Activate pairing, disconnect from paired device
  * */

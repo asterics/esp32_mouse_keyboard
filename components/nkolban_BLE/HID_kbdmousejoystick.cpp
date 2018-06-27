@@ -42,7 +42,6 @@
 
 #include "sdkconfig.h"
 
-#define BT_DEVICENAME "FABI"
 static char LOG_TAG[] = "HAL_BLE";
 
 /// @brief Input queue for sending joystick reports
@@ -63,6 +62,10 @@ uint8_t activateMouse = 0;
 uint8_t activateJoystick = 0;
 ///@brief Is this device in testmode (automatically sending HID reports)?
 uint8_t testmode = 0;
+
+///@brief The BT Devicename for advertising
+char btname[40];
+
 
 //static BLEHIDDevice class instance for communication (sending reports)
 static BLEHIDDevice* hid;
@@ -521,7 +524,7 @@ class BLE_HOG: public Task {
       joystick->setStackSize(8096);
     }
     
-		BLEDevice::init(BT_DEVICENAME);
+		BLEDevice::init(btname);
 		pServer = BLEDevice::createServer();
 		pServer->setCallbacks(new CBs());
 		//BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_NO_MITM);
@@ -726,13 +729,15 @@ extern "C" {
   /** @brief Main init function to start HID interface (C interface)
    * 
    * @note After init, just use the queues! */
-  esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse, uint8_t enableJoystick, uint8_t testmode)
+  esp_err_t HID_kbdmousejoystick_init(uint8_t enableKeyboard, uint8_t enableMouse, uint8_t enableJoystick, uint8_t testmode, char * name)
   {
     //init FreeRTOS queues
     //initialise queues, even if they might not be used.
     mouse_q = xQueueCreate(32,sizeof(mouse_command_t));
     keyboard_q = xQueueCreate(32,sizeof(keyboard_command_t));
     joystick_q = xQueueCreate(32,sizeof(joystick_command_t));
+    
+    strncpy(btname, name, sizeof(btname)-1);
     
     //save enabled interfaces
     activateMouse = enableMouse;

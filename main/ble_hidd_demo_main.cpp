@@ -30,6 +30,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
+#include "driver/gpio.h"
 
 #include "config.h"
 #include "HID_kbdmousejoystick.h"
@@ -50,8 +51,6 @@
 #define MOUSE_SPEED 30
 #define MAX_CMDLEN  100
 
-#define GATTS_TAG "FABI/FLIPMOUSE"
-
 #define EXT_UART_TAG "EXT_UART"
 #define CONSOLE_UART_TAG "CONSOLE_UART"
 
@@ -66,7 +65,7 @@ static config_data_t config;
 void update_config()
 {
     nvs_handle my_handle;
-    esp_err_t err = nvs_open("fabi_c", NVS_READWRITE, &my_handle);
+    esp_err_t err = nvs_open("config_c", NVS_READWRITE, &my_handle);
     if(err != ESP_OK) ESP_LOGE("MAIN","error opening NVS");
     err = nvs_set_str(my_handle, "btname", config.bt_device_name);
     if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - bt name");
@@ -144,8 +143,6 @@ int get_int(const char * input, int index, int * value)
 void processCommand(struct cmdBuf *cmdBuffer)
 {
     //commands:
-    // $ID_FABI (set devicename to "Fabi")
-    // $ID_FLIPMOUSE (set devicename to "FlipMouse") 
     // $ID
     // $PMx (0 or 1)
     // $GP
@@ -403,7 +400,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
         return;
     }
     
-    //set BT names (either FABI or FLipMouse)
+    //set BT GATT advertising name
     if(strncmp(input,"NAME ", 5) == 0) 
     {
 		if ((strlen(input)>6) && (strlen(input)-4<MAX_BT_DEVICENAME_LENGTH))
@@ -633,6 +630,28 @@ void uart_external(void *pvParameters)
     }
 }
 
+void blink_task(void *pvParameter)
+{
+    // Initialize GPIO pins
+    gpio_pad_select_gpio(INDICATOR_LED_PIN);
+    gpio_set_direction(INDICATOR_LED_PIN, GPIO_MODE_OUTPUT);
+    int blinkTime;
+    
+    while(1) {
+		
+		if (HID_kbdmousejoystick_isConnected()) 
+			blinkTime=1000;
+		else blinkTime=250;
+		
+		
+        /* Blink off (output low) */
+        gpio_set_level(INDICATOR_LED_PIN, 0);
+        vTaskDelay(blinkTime / portTICK_PERIOD_MS);
+        /* Blink on (output high) */
+        gpio_set_level(INDICATOR_LED_PIN, 1);
+        vTaskDelay(blinkTime / portTICK_PERIOD_MS);
+    }
+}
 
 extern "C" void app_main()
 {
@@ -649,15 +668,15 @@ extern "C" void app_main()
     // Read config
     nvs_handle my_handle;
 	ESP_LOGI("MAIN","loading configuration from NVS");
-    ret = nvs_open("fabi_c", NVS_READWRITE, &my_handle);
+    ret = nvs_open("config_c", NVS_READWRITE, &my_handle);
     if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS");
     size_t available_size = MAX_BT_DEVICENAME_LENGTH;
-    strcpy(config.bt_device_name, "FABI");
+    strcpy(config.bt_device_name, GATTS_TAG);
     nvs_get_str (my_handle, "btname", config.bt_device_name, &available_size);
     if(ret != ESP_OK) 
     {
-        ESP_LOGE("MAIN","error reading NVS - bt name, setting to FABI");
-        strcpy(config.bt_device_name, "FABI");
+        ESP_LOGE("MAIN","error reading NVS - bt name, setting to default");
+        strcpy(config.bt_device_name, GATTS_TAG);
     } else ESP_LOGI("MAIN","bt device name is: %s",config.bt_device_name);
 
     ret = nvs_get_u8(my_handle, "locale", &config.locale);
@@ -674,15 +693,16 @@ extern "C" void app_main()
 
 
     //activate mouse & keyboard BT stack (joystick is not working yet)
-    HID_kbdmousejoystick_init(1,1,0,0);
+    HID_kbdmousejoystick_init(1,1,0,0,config.bt_device_name);
     ESP_LOGI("HIDD","MAIN finished...");
     
     esp_log_level_set("*", ESP_LOG_INFO); 
 
   
-    // now start the tasks for processing UART input  
+    // now start the tasks for processing UART input and indicator LED  
  
     xTaskCreate(&uart_console,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
     xTaskCreate(&uart_external, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
+    xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
     
 }

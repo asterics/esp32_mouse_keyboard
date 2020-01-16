@@ -1,6 +1,9 @@
-/** very simple:
- * undef everything from keylayouts.h */
- 
+/** @file
+ * This file is very simple: undef everything 
+ * which was defined in keylayouts.h 
+ * @see keyboard.c for explanation*/
+
+///@cond DONOTUSETHISFILE
 #undef KEYLAYOUTS_H__
 
 #undef LAYOUT_US_ENGLISH
@@ -432,3 +435,5 @@
 #undef ISO_8859_1_FD
 #undef ISO_8859_1_FE
 #undef ISO_8859_1_FF
+
+///@endcond

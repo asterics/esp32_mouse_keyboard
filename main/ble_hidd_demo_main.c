@@ -26,14 +26,14 @@
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
-#include "esp_event_loop.h"
+#include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
 #include "driver/gpio.h"
 
 #include "config.h"
-#include "HID_kbdmousejoystick.h"
+#include "ble_hid/hal_ble.h"
 
 #include "esp_gap_ble_api.h"
 //#include "esp_hidd_prf_api.h"
@@ -59,7 +59,7 @@ static uint8_t keycode_modifier=0;
 static uint8_t keycode_deadkey_first=0;
 //static joystick_data_t joystick;//currently unused, no joystick implemented
 static config_data_t config;
-// joystick_command_t joystickCmd;
+QueueHandle_t hid_ble;
 
 
 void update_config()
@@ -78,14 +78,27 @@ void update_config()
 }
 
 
-void sendKeyCode(uint8_t c, keyboard_action type) {
-	keyboard_command_t keyboardCmd;
-	keyboardCmd.type = type;
-	keyboardCmd.keycode = c + ((uint16_t)keycode_modifier << 8);
-	xQueueSend(keyboard_q,(void *)&keyboardCmd, (TickType_t) 0);
+void sendKeyCode(uint8_t c, uint8_t type) {
+    hid_cmd_t keyboardCmd;
+    if(keycode_modifier != 0)
+    {
+        keyboardCmd.cmd[0] = 0x25;
+        keyboardCmd.cmd[1] = keycode_modifier;
+        xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
+    }
+    keyboardCmd.cmd[0] = type;
+    keyboardCmd.cmd[1] = c;
+	xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
+    if(keycode_modifier != 0)
+    {
+        keyboardCmd.cmd[0] = 0x26;
+        keyboardCmd.cmd[1] = keycode_modifier;
+        xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
+    }
+    keycode_modifier = 0;
 }
 
-void sendKey(uint8_t c, keyboard_action type) {
+void sendKey(uint8_t c, uint8_t type) {
     uint8_t keycode;
 	keycode = parse_for_keycode(c,config.locale,&keycode_modifier,&keycode_deadkey_first); //send current byte to parser
 	if(keycode == 0) 
@@ -221,7 +234,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     //keyboard: release all
     if(strcmp(input,"KR") == 0)
     {
-		sendKeyCode(0, RELEASE_ALL);
+		sendKeyCode(0, 0x2F);
         ESP_LOGD(EXT_UART_TAG,"keyboard: release all (KR)");
         return;
     }
@@ -243,13 +256,13 @@ void processCommand(struct cmdBuf *cmdBuffer)
             //key up
             if(input[1] == 'U')
             {
-                sendKeyCode(param, RELEASE);
+                sendKeyCode(param, 0x22);
                 return;
             }
             //key down
             if(input[1] == 'D') 
             {
-                sendKeyCode(param, PRESS);
+                sendKeyCode(param, 0x21);
                 return;
             }
             //keyboard, set locale
@@ -273,7 +286,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
                         ESP_LOGI(EXT_UART_TAG,"terminated string, ending KW");
                         break;
                     }
-                    sendKey(input[i],PRESS_RELEASE);
+                    sendKey(input[i],0x20);
                 }
                 return;
             }
@@ -328,15 +341,23 @@ void processCommand(struct cmdBuf *cmdBuffer)
     if(input[0] == 'M')
     {
 		int index=1, value;
-		mouse_command_t mouseCmd;
+		int buttons, x;
+		hid_cmd_t mouseCmd;
 
-		if ((index=get_int(input,index,&value))) mouseCmd.buttons = value; else return;
-		if ((index=get_int(input,index,&value))) mouseCmd.x = value; else return;
-		if ((index=get_int(input,index,&value))) mouseCmd.y = value; else return;
-		if ((index=get_int(input,index,&value))) mouseCmd.wheel = value; else return;
-
-        xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
-        ESP_LOGI(EXT_UART_TAG,"mouse command: %d,%d,%d,%d",mouseCmd.buttons,mouseCmd.x,mouseCmd.y,mouseCmd.wheel);
+		mouseCmd.cmd[0] = 0x02; 
+		if ((index=get_int(input,index,&value))) mouseCmd.cmd[1] = value; else return;
+		if ((index=get_int(input,index,&value))) mouseCmd.cmd[2] = value; else return;
+		buttons = mouseCmd.cmd[1];
+		x = mouseCmd.cmd[2];
+		xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
+		
+		mouseCmd.cmd[0] = 0x03; 
+		if ((index=get_int(input,index,&value))) mouseCmd.cmd[1] = value; else return;
+		if ((index=get_int(input,index,&value))) mouseCmd.cmd[2] = value; else return;
+		xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
+		
+        //xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+        ESP_LOGI(EXT_UART_TAG,"mouse command: %d,%d,%d,%d",buttons,x,mouseCmd.cmd[1],mouseCmd.cmd[2]);
         return;
     }
     
@@ -388,12 +409,12 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		
         if(param == 0)
         {
-            HID_kbdmousejoystick_deactivatePairing();
+            halBLESetPairing(0);
             ESP_LOGI(EXT_UART_TAG,"PM: pairing deactivated");
 
         } else if(param == 1) 
         {
-            HID_kbdmousejoystick_activatePairing();
+            halBLESetPairing(1);
             ESP_LOGI(EXT_UART_TAG,"PM: pairing activated");
 
         } else ESP_LOGE(EXT_UART_TAG,"PM: parameter error, either 0 or 1");
@@ -421,6 +442,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
 void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 {
     static uint8_t keycode = 0;
+    hid_cmd_t hid;
     
     switch (cmdBuffer->state) {
 		
@@ -434,7 +456,7 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 					cmdBuffer->bufferLength=0;   // we will read an ASCII-command until CR or LF  
 					cmdBuffer->state=CMDSTATE_GET_ASCII;
 				}
-				else sendKey(character, PRESS_RELEASE);         // treat whatever comes in as keyboard output
+				else sendKey(character, 0x20);         // treat whatever comes in as keyboard output
 				break;
 							
 		case CMDSTATE_GET_RAW:
@@ -447,17 +469,20 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 				if (!cmdBuffer->expectedBytes) {
 					if (cmdBuffer->buf[1] == 0x00) {   // keyboard report				
 						// TBD: synchonize with semaphore!	
-						if(HID_kbdmousejoystick_rawKeyboard(cmdBuffer->buf,8) != ESP_OK)
+						ESP_LOGE(EXT_UART_TAG,"TBD: implement RAW keyboard");
+						/*if(HID_kbdmousejoystick_rawKeyboard(cmdBuffer->buf,8) != ESP_OK)
 						{
 							ESP_LOGE(EXT_UART_TAG,"Error sending raw kbd");
-						} else ESP_LOGI(EXT_UART_TAG,"Keyboard sent");
+						} else ESP_LOGI(EXT_UART_TAG,"Keyboard sent");*/
 					} else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
-						// TBD: synchonize with semaphore!	
-						if(HID_kbdmousejoystick_rawMouse(&(cmdBuffer->buf[2]),4) != ESP_OK)
-						{
-							ESP_LOGE(EXT_UART_TAG,"Error sending raw mouse");
-						} else ESP_LOGI(EXT_UART_TAG,"Mouse sent");
-
+						hid.cmd[0] = 0x02;
+						hid.cmd[1] = cmdBuffer->buf[2]; //buttons
+						hid.cmd[2] = cmdBuffer->buf[3]; //X
+						xQueueSend(hid_ble,(void *)&hid, (TickType_t) 2);
+						hid.cmd[0] = 0x03;
+						hid.cmd[1] = cmdBuffer->buf[4]; //Y
+						hid.cmd[2] = cmdBuffer->buf[5]; //wheel
+						xQueueSend(hid_ble,(void *)&hid, (TickType_t) 2);
 					}
                     else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
                     cmdBuffer->state=CMDSTATE_IDLE;
@@ -466,7 +491,7 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 				
 		case CMDSTATE_GET_ASCII:
 				if (character=='$')  {   //  key '$' can be created by sending "$$" 
-					sendKey('$', PRESS_RELEASE);
+					sendKey('$', 0x20);
 					cmdBuffer->state=CMDSTATE_IDLE;
 				} else {   // collect a command string until CR or LF are received
 					if ((character==0x0d) || (character==0x0a))  {
@@ -491,8 +516,8 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 void uart_console(void *pvParameters)
 {
     char character;
-	mouse_command_t mouseCmd;
-	keyboard_command_t keyboardCmd;
+	hid_cmd_t mouseCmd;
+	hid_cmd_t keyboardCmd;
     
     //Install UART driver, and get the queue.
     uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
@@ -505,79 +530,55 @@ void uart_console(void *pvParameters)
         uart_read_bytes(CONSOLE_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
 		// uart_parse_command(character, &cmdBuffer);	      	
 
-		if(HID_kbdmousejoystick_isConnected() == 0) {
+		if(halBLEIsConnected() == 0) {
 			ESP_LOGI(CONSOLE_UART_TAG,"Not connected, ignoring '%c'", character);
 		} else {
 			//Do not send anything if queues are uninitialized
-			if(mouse_q == NULL || keyboard_q == NULL || joystick_q == NULL)
+			if(hid_ble == NULL)
 			{
 				ESP_LOGE(CONSOLE_UART_TAG,"queues not initialized");
 				continue;
 			}
 			switch (character){
 				case 'a':
-					mouseCmd.x = -MOUSE_SPEED;
-					mouseCmd.y = 0;
-					mouseCmd.buttons = 0;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+					mouseCmd.cmd[0] = 0x10;
+					mouseCmd.cmd[1] = -MOUSE_SPEED;
+					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
 					ESP_LOGI(CONSOLE_UART_TAG,"mouse: a");
 					break;
 				case 's':
-					mouseCmd.x = 0;
-					mouseCmd.y = MOUSE_SPEED;
-					mouseCmd.buttons = 0;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+					mouseCmd.cmd[0] = 0x11;
+					mouseCmd.cmd[1] = MOUSE_SPEED;
+					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
 					ESP_LOGI(CONSOLE_UART_TAG,"mouse: s");
 					break;
 				case 'd':
-					mouseCmd.x = MOUSE_SPEED;
-					mouseCmd.y = 0;
-					mouseCmd.buttons = 0;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+					mouseCmd.cmd[0] = 0x10;
+					mouseCmd.cmd[1] = MOUSE_SPEED;
+					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
 					ESP_LOGI(CONSOLE_UART_TAG,"mouse: d");
 					break;
 				case 'w':
-					mouseCmd.x = 0;
-					mouseCmd.y = -MOUSE_SPEED;
-					mouseCmd.buttons = 0;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+					mouseCmd.cmd[0] = 0x11;
+					mouseCmd.cmd[1] = -MOUSE_SPEED;
+					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
 					ESP_LOGI(CONSOLE_UART_TAG,"mouse: w");
 					break;
 				case 'l':
-					mouseCmd.x = 0;
-					mouseCmd.y = 0;
-					mouseCmd.buttons = 1;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
-					mouseCmd.x = 0;
-					mouseCmd.y = 0;
-					mouseCmd.buttons = 0;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+					mouseCmd.cmd[0] = 0x13;
+					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
 					ESP_LOGI(CONSOLE_UART_TAG,"mouse: l");
 					break;
 				case 'r':
-					mouseCmd.x = 0;
-					mouseCmd.y = 0;
-					mouseCmd.buttons = 2;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
-					mouseCmd.x = 0;
-					mouseCmd.y = 0;
-					mouseCmd.buttons = 0;
-					mouseCmd.wheel = 0;
-					xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
+					mouseCmd.cmd[0] = 0x14;
+					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
 					ESP_LOGI(CONSOLE_UART_TAG,"mouse: r");
 					break;
 				case 'q':
 					ESP_LOGI(CONSOLE_UART_TAG,"received q: sending key y for test purposes");
-					keyboardCmd.keycode = 28;
-					keyboardCmd.type = PRESS_RELEASE;
-					xQueueSend(keyboard_q,(void *)&keyboardCmd, (TickType_t) 0);
+					keyboardCmd.cmd[0] = 0x20;
+					keyboardCmd.cmd[1] = 28;
+					xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
 					break;
 				default:
 					ESP_LOGI(CONSOLE_UART_TAG,"received: %d",character);
@@ -639,7 +640,7 @@ void blink_task(void *pvParameter)
     
     while(1) {
 		
-		if (HID_kbdmousejoystick_isConnected()) 
+		if (halBLEIsConnected()) 
 			blinkTime=1000;
 		else blinkTime=250;
 		
@@ -653,9 +654,11 @@ void blink_task(void *pvParameter)
     }
 }
 
-extern "C" void app_main()
+void app_main()
 {
     esp_err_t ret;
+    
+    esp_log_level_set("*", ESP_LOG_VERBOSE);
 
     // Initialize NVS.
     ret = nvs_flash_init();
@@ -693,10 +696,11 @@ extern "C" void app_main()
 
 
     //activate mouse & keyboard BT stack (joystick is not working yet)
-    HID_kbdmousejoystick_init(1,1,0,0,config.bt_device_name);
+    halBLEInit(1,1,0,config.bt_device_name);
     ESP_LOGI("HIDD","MAIN finished...");
+    hid_ble = xQueueCreate(32,sizeof(hid_cmd_t));
     
-    esp_log_level_set("*", ESP_LOG_INFO); 
+    esp_log_level_set("*", ESP_LOG_DEBUG); 
 
   
     // now start the tasks for processing UART input and indicator LED  
@@ -706,3 +710,4 @@ extern "C" void app_main()
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
     
 }
+

@@ -83,6 +83,34 @@ extern "C"{
 #define KEY_SYSTEM_SLEEP        ( 0x82 | 0xE200 )
 #define KEY_SYSTEM_WAKE_UP      ( 0x83 | 0xE200 )
 
+/*++++++++++++++++*/
+//formerly in ble_hid/hid_dev.h
+//not tested yet
+#define KEY_MEDIA_POWER          (48 | 0xE400 )  // Power
+#define KEY_MEDIA_RESET          (49 | 0xE400 )  // Reset
+#define KEY_MEDIA_SLEEP          (50 | 0xE400 )  // Sleep
+
+#define KEY_MEDIA_MENU           (64 | 0xE400 )  // Menu
+#define KEY_MEDIA_SELECTION      (128 | 0xE400 ) // Selection
+#define KEY_MEDIA_ASSIGN_SEL     (129 | 0xE400 ) // Assign Selection
+#define KEY_MEDIA_MODE_STEP      (130 | 0xE400 ) // Mode Step
+#define KEY_MEDIA_RECALL_LAST    (131 | 0xE400 ) // Recall Last
+#define KEY_MEDIA_QUIT           (148 | 0xE400 ) // Quit
+#define KEY_MEDIA_HELP           (149 | 0xE400 ) // Help
+#define KEY_MEDIA_CHANNEL_UP     (156 | 0xE400 ) // Channel Increment
+#define KEY_MEDIA_CHANNEL_DOWN   (157 | 0xE400 ) // Channel Decrement
+
+
+#define KEY_MEDIA_SELECT_DISC    (186 | 0xE400 ) // Select Disk
+#define KEY_MEDIA_ENTER_DISC     (187 | 0xE400 ) // Enter Disc
+#define KEY_MEDIA_REPEAT         (188 | 0xE400 ) // Repeat
+
+#define KEY_MEDIA_VOLUME         (224 | 0xE400 ) // Volume
+#define KEY_MEDIA_BALANCE        (225 | 0xE400 ) // Balance
+#define KEY_MEDIA_BASS           (227 | 0xE400 ) // Bass
+/*++++++++++++++++*/
+
+
 #define KEY_MEDIA_PLAY          ( 0xB0 | 0xE400 )
 #define KEY_MEDIA_PAUSE         ( 0xB1 | 0xE400 )
 #define KEY_MEDIA_RECORD        ( 0xB2 | 0xE400 )
@@ -92,7 +120,8 @@ extern "C"{
 #define KEY_MEDIA_PREV_TRACK    ( 0xB6 | 0xE400 )
 #define KEY_MEDIA_STOP          ( 0xB7 | 0xE400 )
 #define KEY_MEDIA_EJECT         ( 0xB8 | 0xE400 )
-#define KEY_MEDIA_RANDOM_PLAY   ( 0xB0 | 0xE400 )
+#define KEY_MEDIA_RANDOM_PLAY   ( 0xB9 | 0xE400 )
+#define KEY_MEDIA_STOP_EJECT    ( 0xCC | 0xE400 )
 #define KEY_MEDIA_PLAY_PAUSE    ( 0xCD | 0xE400 )
 #define KEY_MEDIA_PLAY_SKIP     ( 0xCE | 0xE400 )
 #define KEY_MEDIA_MUTE          ( 0xE2 | 0xE400 )

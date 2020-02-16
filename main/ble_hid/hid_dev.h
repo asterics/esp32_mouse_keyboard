@@ -235,6 +235,9 @@ typedef uint8_t consumer_cmd_t;
 // HID mouse input report length
 #define HID_MOUSE_IN_RPT_LEN        5
 
+// HID mouse input report length
+#define HID_ABSMOUSE_IN_RPT_LEN        6
+
 // HID consumer control input report length
 #define HID_CC_IN_RPT_LEN           2
 

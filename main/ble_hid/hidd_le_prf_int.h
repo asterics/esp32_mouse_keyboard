@@ -127,7 +127,7 @@ typedef void (*esp_hidd_event_cb_t) (esp_hidd_cb_event_t event, esp_hidd_cb_para
 #define HID_RPT_ID_MOUSE_IN      1   // Mouse input report ID
 #define HID_RPT_ID_KEY_IN        2   // Keyboard input report ID
 #define HID_RPT_ID_CC_IN         3   //Consumer Control input report ID
-#define HID_RPT_ID_VENDOR_OUT    4   // Vendor output report ID
+#define HID_RPT_ID_ABSMOUSE_IN   4   // Absolute mouse report ID
 #define HID_RPT_ID_JOY_IN        5   // Vendor output report ID
 #define HID_RPT_ID_LED_OUT       0  // LED output report ID
 #define HID_RPT_ID_FEATURE       0  // Feature report ID
@@ -224,11 +224,12 @@ enum {
     HIDD_LE_IDX_REPORT_LED_OUT_VAL,
     HIDD_LE_IDX_REPORT_LED_OUT_REP_REF,
 
-    /// Report Vendor
-    HIDD_LE_IDX_REPORT_VENDOR_OUT_CHAR,
-    HIDD_LE_IDX_REPORT_VENDOR_OUT_VAL,
-    HIDD_LE_IDX_REPORT_VENDOR_OUT_REP_REF,
-
+    /// Report absolute mouse
+    HIDD_LE_IDX_REPORT_ABSMOUSE_IN_CHAR,
+    HIDD_LE_IDX_REPORT_ABSMOUSE_IN_VAL,
+    HIDD_LE_IDX_REPORT_ABSMOUSE_IN_CCC,
+    HIDD_LE_IDX_REPORT_ABSMOUSE_REP_REF,
+    
     HIDD_LE_IDX_REPORT_CC_IN_CHAR,
     HIDD_LE_IDX_REPORT_CC_IN_VAL,
     HIDD_LE_IDX_REPORT_CC_IN_CCC,

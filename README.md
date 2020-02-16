@@ -12,7 +12,7 @@ and to Espressif for providing the HID implementation within the esp-idf.
 # Control via stdin (make monitor)
 
 For basic mouse and keyboard testing, some Bluettooh HID reports can be triggered via the 
-keyboard when the make monitor console is running (see Espressiv IDF: https://github.com/espressif/esp-idf).
+keyboard when the make monitor console is running (see Espressif IDF docs: https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/tools/idf-monitor.html ).
 
 
 |Key|Function   |Description|
@@ -36,18 +36,18 @@ A command must be terminated by a '\n' character (LF, ASCII value 10)!
 
 |Command|Function|Parameters|Description|
 |-------|--------|----------|-----------|
-|ID|Get ID|--|Prints out the ID of this module (firmware version number)|
-|GP|Get BLE pairings|--|Prints out all paired devices' MAC adress. The order is used for DP as well, starting with 0|
-|DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
-|PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
-|NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
-|M|Mouse control|4 ASCII-integer values (seperated by space or comma)|Issue a mouse HID report, parameter description is below|
-|KA|Keyboard, release all|--|Releases all keys & modifiers and sends a HID report|
-|KH|Keyboard, key hold|keycode as ASCII integer value|Adds this keycode to the 6 available key slots and sends a HID report.|
-|KR|Keyboard, key release|keycode as ASCII integer value|Removes this keycode from the 6 available key slots and sends a HID report.|
-|KL|Keyboard, set layout/locale|locale code as ASCII integer value|Set the keyboard layout to the given locale number (see below), stored permanently. Restarting required.|
-|KW|Keyboard write text|n Bytes|Write a text via the keyboard. Supported are ASCII as well as UTF8 character streams.|
-|KC|Keyboard get keycode for character|2 Bytes|Get a corresponding keycode for the given character. 2 Bytes are parsed for UTF8, if there is only a ASCII character, use the first sent byte only.|
+|$ID|Get ID|--|Prints out the ID of this module (firmware version number)|
+|$GP|Get BLE pairings|--|Prints out all paired devices' MAC adress. The order is used for DP as well, starting with 0|
+|$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
+|$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
+|$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
+|$M|Mouse control|4 ASCII-integer values (seperated by space or comma)|Issue a mouse HID report, parameter description is below|
+|$KA|Keyboard, release all|--|Releases all keys & modifiers and sends a HID report|
+|$KH|Keyboard, key hold|keycode as ASCII integer value|Adds this keycode to the 6 available key slots and sends a HID report.|
+|$KR|Keyboard, key release|keycode as ASCII integer value|Removes this keycode from the 6 available key slots and sends a HID report.|
+|$KL|Keyboard, set layout/locale|locale code as ASCII integer value|Set the keyboard layout to the given locale number (see below), stored permanently. Restarting required.|
+|$KW|Keyboard write text|n Bytes|Write a text via the keyboard. Supported are ASCII as well as UTF8 character streams.|
+|$KC|Keyboard get keycode for character|2 Bytes|Get a corresponding keycode for the given character. 2 Bytes are parsed for UTF8, if there is only a ASCII character, use the first sent byte only.|
 
 
 ## Mouse command
@@ -99,3 +99,16 @@ sending the mouse command again.
 |0x18/24| Serbian (Latin only)|
 
 Setting a keyboard locale is done with the "KL" command. Changes taking effect after a restart of the ESP32. This is necessary for initializing the HID country code accordingly.
+
+# RAW HID input
+
+If you want to send HID inputs directly, it is possible to send an HID report directly via:
+
+```
+hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
+                  HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, mouse_report);
+```
+
+Use according `HID_RPT_ID_*`/`HID_*_IN_RPT_LEN`, depending on input type (mouse, keyboard, absolute mouse, joystick).
+The HID report data is located in array, passed as last parameter of `hid_dev_send_report`.
+

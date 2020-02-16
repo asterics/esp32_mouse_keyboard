@@ -205,9 +205,9 @@ static const uint8_t hidReportMap[] = {
 //0x09, 0x38,          //     USAGE (Wheel)
 
     0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
-    0x46, 0x00, 0x08,              //     PHYSICAL_MAXIMUM (2048)
+    0x46, 0xFF, 0xFF,              //     PHYSICAL_MAXIMUM (65535)
     0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-    0x26, 0x00, 0x08,              //     LOGICAL_MAXIMUM (2048)
+    0x26, 0xFF, 0xFF,              //     LOGICAL_MAXIMUM (65535)
     0x65, 0x11,                    //     UNIT (SI Lin:Distance)
     0x55, 0x00,                    //     UNIT_EXPONENT (0)
 

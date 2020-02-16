@@ -88,6 +88,11 @@ void halBLEReset(uint8_t exceptDevice);
  * @see hid_ble */
 esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMouse, uint8_t enableJoystick, char* deviceName);
 
+/** @brief Returns current connection ID
+ * 
+ * The conn id is used for sending HID reports
+ */
+uint16_t halBLEGetConnID();
 
 /** @brief One HID command */
 typedef struct hid_cmd hid_cmd_t;

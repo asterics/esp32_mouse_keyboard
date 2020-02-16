@@ -24,8 +24,16 @@ keyboard when the make monitor console is running (see Espressiv IDF: https://gi
 |l  |Click left |Mouse click right |
 |r  |Click right|Mouse click left  |
 |q  |Type 'y'   |just for testing keyboard reports|
-
-
+|0  | Click left (absolute mouse) | Click left via the absolute mouse input |
+| 1 | Low left   | Move mouse via absolute input to X left, Y low point on screen |
+| 2 | Low center | Move mouse via absolute input to X center, Y low point on screen |
+| 3 | Low right  | Move mouse via absolute input to X right, Y low point on screen |
+| 4 | Middle left | Move mouse via absolute input to X left, Y middle point on screen |
+| 5 | Middle center | Move mouse via absolute input to X center, Y middle point on screen |
+| 6 | Middle right | Move mouse via absolute input to X right, Y middle point on screen |
+| 7 | Top left | Move mouse via absolute input to X left, Y top point on screen |
+| 8 | Top center | Move mouse via absolute input to X center, Y top point on screen |
+| 9 | Top right | Move mouse via absolute input to X right, Y top point on screen |
 
 # Control via 2nd UART
 

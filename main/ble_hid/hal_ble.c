@@ -117,6 +117,16 @@ uint8_t mouse_report[5];
 uint8_t joystick_report[12];
 
 
+/** @brief Returns current connection ID
+ * 
+ * The conn id is used for sending HID reports
+ */
+uint16_t halBLEGetConnID()
+{
+	return hid_conn_id;
+}
+
+
 /** @brief Callback for HID events. */
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param)
 {

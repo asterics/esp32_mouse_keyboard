@@ -441,7 +441,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
 
 void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 {
-    static uint8_t keycode = 0;
+    //static uint8_t keycode = 0;
     hid_cmd_t hid;
     
     switch (cmdBuffer->state) {
@@ -518,6 +518,7 @@ void uart_console(void *pvParameters)
     char character;
 	hid_cmd_t mouseCmd;
 	hid_cmd_t keyboardCmd;
+	static uint8_t absMouseReport[HID_ABSMOUSE_IN_RPT_LEN];
     
     //Install UART driver, and get the queue.
     uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
@@ -579,6 +580,84 @@ void uart_console(void *pvParameters)
 					keyboardCmd.cmd[0] = 0x20;
 					keyboardCmd.cmd[1] = 28;
 					xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
+					break;
+				case '0':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: click left");
+					absMouseReport[0] = 0x01;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					absMouseReport[0] = 0x00;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '1':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X left, Y bottom");
+					absMouseReport[0] = absMouseReport[1] = 0x00;
+					absMouseReport[2] = absMouseReport[3] = 0xFF;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '2':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X center, Y bottom");
+					absMouseReport[0] = 0x7F;
+					absMouseReport[1] = 0xFF;
+					absMouseReport[2] = absMouseReport[3] = 0xFF;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '3':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X right, Y bottom");
+					absMouseReport[0] = absMouseReport[1] = 0xFF;
+					absMouseReport[2] = absMouseReport[3] = 0xFF;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '4':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X left, Y center");
+					absMouseReport[0] = absMouseReport[1] = 0x00;
+					absMouseReport[2] = 0x7F;
+					absMouseReport[3] = 0xFF;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '5':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X center, Y center");
+					absMouseReport[0] = 0x7F;
+					absMouseReport[1] = 0xFF;
+					absMouseReport[2] = 0x7F;
+					absMouseReport[3] = 0xFF;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '6':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X right, Y center");
+					absMouseReport[0] = absMouseReport[1] = 0xFF;
+					absMouseReport[2] = 0x7F;
+					absMouseReport[3] = 0xFF;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '7':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X left, Y top");
+					absMouseReport[0] = absMouseReport[1] = 0x00;
+					absMouseReport[2] = absMouseReport[3] = 0x00;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '8':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X center, Y top");
+					absMouseReport[0] = 0x7F;
+					absMouseReport[1] = 0xFF;
+					absMouseReport[2] = absMouseReport[3] = 0x00;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
+					break;
+				case '9':
+					ESP_LOGI(CONSOLE_UART_TAG,"abs mouse: X right, Y top");
+					absMouseReport[0] = absMouseReport[1] = 0xFF;
+					absMouseReport[2] = absMouseReport[3] = 0x00;
+					hid_dev_send_report(hidd_le_env.gatt_if, halBLEGetConnID(),
+						HID_RPT_ID_ABSMOUSE_IN, HID_REPORT_TYPE_INPUT, HID_ABSMOUSE_IN_RPT_LEN, absMouseReport);
 					break;
 				default:
 					ESP_LOGI(CONSOLE_UART_TAG,"received: %d",character);

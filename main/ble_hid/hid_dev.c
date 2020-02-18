@@ -31,7 +31,7 @@ static hid_report_map_t *hid_dev_rpt_by_id(uint8_t id, uint8_t type)
             return rpt;
         }
     }
-
+	ESP_LOGW(HID_LE_PRF_TAG,"Cannot find report by ID: %d, type: %d",id, type);
     return NULL;
 }
 

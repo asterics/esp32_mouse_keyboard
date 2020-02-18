@@ -26,7 +26,7 @@
 #define LOG_TAG "hal_ble"
 
 /** @brief Set a global log limit for this file */
-#define LOG_LEVEL_BLE ESP_LOG_WARN
+#define LOG_LEVEL_BLE ESP_LOG_VERBOSE
 
 /** @brief Connection ID for an opened HID connection */
 static uint16_t hid_conn_id = 0;

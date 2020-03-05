@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := hidd_demos
+PROJECT_NAME := esp32_mouse_keyboard
 
 COMPONENT_ADD_INCLUDEDIRS := components/include	\
 								

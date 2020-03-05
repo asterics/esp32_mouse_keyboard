@@ -3,8 +3,8 @@ ESP32 implementation for HID over GATT Keyboard and Mouse (Bluetooth Low Energy)
 
 ### Credits and many thanks to:
 - Paul Stoffregen for the implementation of the keyboard layouts for his Teensyduino project: www.pjrc.com
-- Neil Kolban for his great contributions to the ESP32 SW (in particular the Bluetooth support): https://github.com/nkolban
-- Chegewara for help and support
+- Neil Kolban & Chegewara for their great contributions to the ESP32 SW: https://github.com/nkolban/esp32-snippets/
+- Chegewara for advices on the BLE stuff
  
 and to Espressif for providing the HID implementation within the esp-idf.
 

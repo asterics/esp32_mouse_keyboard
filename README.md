@@ -13,7 +13,7 @@ __Note:__ Due to frequent breaking changes within the esp-idf and all build tool
 
 To get this version, use the following commands:
 
-  `git clone -b release/v4.1 --recursive https://github.com/espressif/esp-idf.git`
+  `git clone -b release/v4.1 --recursive https://github.com/espressif/esp-idf.git`  
   `cd esp-idf`  
   `./install.sh`  
   `. ./export.sh`  

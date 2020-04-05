@@ -1,15 +1,32 @@
 # ESP32 Mouse/Keyboard for BLE HID
 ESP32 implementation for HID over GATT Keyboard and Mouse (Bluetooth Low Energy). Including serial API for external modules (similar to Adafruit EZKey HID).
 
-### Credits and many thanks to:
-- Paul Stoffregen for the implementation of the keyboard layouts for his Teensyduino project: www.pjrc.com
-- Neil Kolban for his great contributions to the ESP32 SW (in particular the Bluetooth support): https://github.com/nkolban
-- Chegewara for help and support
- 
-and to Espressif for providing the HID implementation within the esp-idf.
+## Building the ESP32 firmware
+
+Please follow the step-by-step instructions of Espressif's ESP-IDF manual to setup the build infrastructure:
+[Setup Toolchain](https://esp-idf.readthedocs.io/en/latest/get-started/index.html#setup-toolchain)
 
 
-# Control via stdin (make monitor)
+__Note:__ Due to frequent breaking changes within the esp-idf and all build tools, we recommend to use a specific version of the tools:
+* release v4.1 (on 04.02.2020)
+* master branch (on 04.02.2020)
+
+To get this version, use the following commands:
+
+  `git clone -b release/v4.1 --recursive https://github.com/espressif/esp-idf.git`
+  `cd esp-idf`  
+  `./install.sh`  
+  `. ./export.sh`  
+
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																												
+__Now change your directory into the root directory of this repository.__
+
+After a successful setup, you should be able to build the firmware by executing 'make flash monitor'.
+
+
+# Usage via Console or second UART
+
+## Control via stdin (make monitor)
 
 For basic mouse and keyboard testing, some Bluettooh HID reports can be triggered via the 
 keyboard when the make monitor console is running (see Espressif IDF docs: https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/tools/idf-monitor.html ).
@@ -27,7 +44,7 @@ keyboard when the make monitor console is running (see Espressif IDF docs: https
 
 
 
-# Control via 2nd UART
+## Control via 2nd UART
 
 This interface is primarily used to control mouse / keyboard activities via an external microcontroller.
 Each command is started with a '$' character, followed by a command name (uppercase letters) and a variable number of parameters.
@@ -100,7 +117,7 @@ sending the mouse command again.
 
 Setting a keyboard locale is done with the "KL" command. Changes taking effect after a restart of the ESP32. This is necessary for initializing the HID country code accordingly.
 
-# RAW HID input
+## RAW HID input
 
 If you want to send HID inputs directly, it is possible to send an HID report directly via:
 
@@ -111,4 +128,13 @@ hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
 
 Use according `HID_RPT_ID_*`/`HID_*_IN_RPT_LEN`, depending on input type (mouse, keyboard, absolute mouse, joystick).
 The HID report data is located in array, passed as last parameter of `hid_dev_send_report`.
+
+
+### Credits and many thanks to:
+- Paul Stoffregen for the implementation of the keyboard layouts for his Teensyduino project: www.pjrc.com
+- Neil Kolban for his great contributions to the ESP32 SW (in particular the Bluetooth support): https://github.com/nkolban
+- Chegewara for help and support
+ 
+and to Espressif for providing the HID implementation within the esp-idf.
+
 

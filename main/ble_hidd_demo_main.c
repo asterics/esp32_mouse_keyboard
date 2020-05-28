@@ -34,6 +34,7 @@
 
 #include "config.h"
 #include "ble_hid/hal_ble.h"
+#include "ble_hid/hid_dev.h"
 
 #include "esp_gap_ble_api.h"
 //#include "esp_hidd_prf_api.h"
@@ -468,12 +469,17 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 				cmdBuffer->expectedBytes--;
 				if (!cmdBuffer->expectedBytes) {
 					if (cmdBuffer->buf[1] == 0x00) {   // keyboard report				
-						// TBD: synchonize with semaphore!	
-						ESP_LOGE(EXT_UART_TAG,"TBD: implement RAW keyboard");
-						/*if(HID_kbdmousejoystick_rawKeyboard(cmdBuffer->buf,8) != ESP_OK)
-						{
-							ESP_LOGE(EXT_UART_TAG,"Error sending raw kbd");
-						} else ESP_LOGI(EXT_UART_TAG,"Keyboard sent");*/
+						uint8_t kbd[HID_KEYBOARD_IN_RPT_LEN];
+						kbd[0] = cmdBuffer->buf[0];
+						kbd[1] = cmdBuffer->buf[2];
+						kbd[2] = cmdBuffer->buf[3];
+						kbd[3] = cmdBuffer->buf[4];
+						kbd[4] = cmdBuffer->buf[5];
+						kbd[5] = cmdBuffer->buf[6];
+						kbd[6] = cmdBuffer->buf[7];
+						kbd[7] = 0;
+						hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
+							HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, kbd);
 					} else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
 						hid.cmd[0] = 0x02;
 						hid.cmd[1] = cmdBuffer->buf[2]; //buttons

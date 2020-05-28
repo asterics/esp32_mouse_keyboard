@@ -101,4 +101,6 @@ struct hid_cmd {
 };
 
 
+uint16_t getConnID();
+
 #endif /* _HAL_BLE_H_ */

@@ -42,6 +42,11 @@ static uint8_t hidd_service_uuid128[] = {
     0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x12, 0x18, 0x00, 0x00,
 };
 
+uint16_t getConnID()
+{
+	return hid_conn_id;
+}
+
 /** @brief Advertising data for BLE */
 static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
@@ -83,7 +88,7 @@ uint8_t activateJoystick = 0;
  * This report is changed and sent on an incoming command
  * 1. byte is the modifier, bytes 2-7 are keycodes
  */
-uint8_t keyboard_report[8];
+uint8_t keyboard_report[7];
 
 
 /** @brief Currently active mouse report
@@ -178,6 +183,19 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
           ESP_LOGE(LOG_TAG, "fail reason = 0x%x",param->ble_security.auth_cmpl.fail_reason);
       }
       break;
+      
+	case ESP_GAP_BLE_PASSKEY_NOTIF_EVT:                          /*!< passkey notification event */
+		ESP_LOGI(LOG_TAG,"ESP_GAP_BLE_PASSKEY_NOTIF_EVT: %d",param->ble_security.key_notif.passkey);
+		break;
+    case ESP_GAP_BLE_PASSKEY_REQ_EVT:                            /*!< passkey request event */
+		ESP_LOGI(LOG_TAG,"ESP_GAP_BLE_PASSKEY_REQ_EVT");
+		break;
+    case ESP_GAP_BLE_OOB_REQ_EVT:                                /*!< OOB request event */
+		ESP_LOGI(LOG_TAG,"ESP_GAP_BLE_OOB_REQ_EVT");
+		break;
+    case ESP_GAP_BLE_NC_REQ_EVT:                                 /*!< Numeric Comparison request event */
+		ESP_LOGI(LOG_TAG,"ESP_GAP_BLE_NC_REQ_EVT: %d",param->ble_security.key_notif.passkey);
+		break;
     default:
         break;
   }

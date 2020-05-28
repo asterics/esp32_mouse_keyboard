@@ -224,7 +224,7 @@ typedef uint8_t consumer_cmd_t;
                                         (s)[1] |= ((x) & 0x03) << 4
 
 // HID keyboard input report length
-#define HID_KEYBOARD_IN_RPT_LEN     8
+#define HID_KEYBOARD_IN_RPT_LEN     7
 
 // HID keyboard input report length
 #define HID_JOYSTICK_IN_RPT_LEN     12

@@ -229,9 +229,6 @@ typedef uint8_t consumer_cmd_t;
 // HID keyboard input report length
 #define HID_JOYSTICK_IN_RPT_LEN     12
 
-// HID LED output report length
-#define HID_LED_OUT_RPT_LEN         1
-
 // HID mouse input report length
 #define HID_MOUSE_IN_RPT_LEN        5
 

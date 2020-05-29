@@ -462,8 +462,10 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 							
 		case CMDSTATE_GET_RAW:
 				cmdBuffer->buf[cmdBuffer->bufferLength]=character;
-				//if ((cmdBuffer->bufferLength == 1) && (character==0x00))  // we have a keyboard report: increase by 2 bytes
-				  // cmdBuffer->expectedBytes += 2;
+				if ((cmdBuffer->bufferLength == 1) && (character==0x01)) { // we have a joystick report: increase by 4 bytes
+				   cmdBuffer->expectedBytes += 6;
+				   //ESP_LOGI(EXT_UART_TAG,"expecting 4 more bytes for joystick");
+			    }
 
 				cmdBuffer->bufferLength++;
 				cmdBuffer->expectedBytes--;
@@ -478,8 +480,18 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 						kbd[5] = cmdBuffer->buf[6];
 						kbd[6] = cmdBuffer->buf[7];
 						kbd[7] = 0;
-						hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
-							HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, kbd);
+						if(getConnID != -1)
+						{
+							hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
+								HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, kbd);
+						}
+					} else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
+						//ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+						if(getConnID != -1)
+						{
+							hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
+								HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT, HID_JOYSTICK_IN_RPT_LEN, &cmdBuffer->buf[2]);
+						}
 					} else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
 						hid.cmd[0] = 0x02;
 						hid.cmd[1] = cmdBuffer->buf[2]; //buttons

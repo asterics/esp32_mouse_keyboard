@@ -124,13 +124,11 @@ typedef void (*esp_hidd_event_cb_t) (esp_hidd_cb_event_t event, esp_hidd_cb_para
 #define HID_NUM_REPORTS          9
 
 // HID Report IDs for the service
+#define HID_RPT_ID_FEATURE       0  // Feature report ID
 #define HID_RPT_ID_MOUSE_IN      1   // Mouse input report ID
 #define HID_RPT_ID_KEY_IN        2   // Keyboard input report ID
 #define HID_RPT_ID_CC_IN         3   //Consumer Control input report ID
-#define HID_RPT_ID_VENDOR_OUT    0   // Vendor output report ID
-#define HID_RPT_ID_JOY_IN        0   // Vendor output report ID
-#define HID_RPT_ID_LED_OUT       0  // LED output report ID
-#define HID_RPT_ID_FEATURE       0  // Feature report ID
+#define HID_RPT_ID_JOY_IN        4   // Joystick input report ID
 
 #define HIDD_APP_ID			0x1812//ATT_SVC_HID
 
@@ -219,8 +217,13 @@ enum {
     HIDD_LE_IDX_REPORT_KEY_IN_VAL,
     HIDD_LE_IDX_REPORT_KEY_IN_CCC,
     HIDD_LE_IDX_REPORT_KEY_IN_REP_REF,
-    /// Report Vendor
-
+    //Report Joystick input
+    HIDD_LE_IDX_REPORT_JOY_IN_CHAR,
+    HIDD_LE_IDX_REPORT_JOY_IN_VAL,
+    HIDD_LE_IDX_REPORT_JOY_IN_CCC,
+    HIDD_LE_IDX_REPORT_JOY_IN_REP_REF,
+    
+	//report consumer control
     HIDD_LE_IDX_REPORT_CC_IN_CHAR,
     HIDD_LE_IDX_REPORT_CC_IN_VAL,
     HIDD_LE_IDX_REPORT_CC_IN_CCC,

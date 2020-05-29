@@ -143,6 +143,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
       break;
     case ESP_HIDD_EVENT_BLE_DISCONNECT:
       sec_conn = false;
+      hid_conn_id = -1;
       ESP_LOGI(LOG_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
       esp_ble_gap_start_advertising(&hidd_adv_params);
       break;

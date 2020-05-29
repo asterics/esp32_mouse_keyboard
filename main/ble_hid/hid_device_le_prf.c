@@ -163,6 +163,50 @@ static const uint8_t hidReportMap[] = {
     0xC0,           //   End Collection
     0x81, 0x03,   //   Input (Const, Var, Abs)
     0xC0,            // End Collection
+    
+        0x05, 0x01,                     // Usage Page (Generic Desktop)
+        0x09, 0x04,                     // Usage (Joystick)
+        0xA1, 0x01,                     // Collection (Application)
+        0x85, 0x04,   // Report Id (4)
+        0x15, 0x00,                     //   Logical Minimum (0)
+        0x25, 0x01,                     //   Logical Maximum (1)
+        0x75, 0x01,                     //   Report Size (1)
+        0x95, 0x20,                     //   Report Count (32)
+        0x05, 0x09,                     //   Usage Page (Button)
+        0x19, 0x01,                     //   Usage Minimum (Button #1)
+        0x29, 0x20,                     //   Usage Maximum (Button #32)
+        0x81, 0x02,                     //   Input (variable,absolute)
+        0x15, 0x00,                     //   Logical Minimum (0)
+        0x25, 0x07,                     //   Logical Maximum (7)
+        0x35, 0x00,                     //   Physical Minimum (0)
+        0x46, 0x3B, 0x01,               //   Physical Maximum (315)
+        0x75, 0x04,                     //   Report Size (4)
+        0x95, 0x01,                     //   Report Count (1)
+        0x65, 0x14,                     //   Unit (20)
+        0x05, 0x01,                     //   Usage Page (Generic Desktop)
+        0x09, 0x39,                     //   Usage (Hat switch)
+        0x81, 0x42,                     //   Input (variable,absolute,null_state)
+        0x05, 0x01,                     //   Usage Page (Generic Desktop)
+        0x09, 0x01,                     //   Usage (Pointer)
+        0xA1, 0x00,                     //   Collection ()
+        0x15, 0x00,                     //     Logical Minimum (0)
+        0x26, 0xFF, 0x03,               //     Logical Maximum (1023)
+        0x75, 0x0A,                     //     Report Size (10)
+        0x95, 0x04,                     //     Report Count (4)
+        0x09, 0x30,                     //     Usage (X)
+        0x09, 0x31,                     //     Usage (Y)
+        0x09, 0x32,                     //     Usage (Z)
+        0x09, 0x35,                     //     Usage (Rz)
+        0x81, 0x02,                     //     Input (variable,absolute)
+        0xC0,                           //   End Collection
+        0x15, 0x00,                     //   Logical Minimum (0)
+        0x26, 0xFF, 0x03,               //   Logical Maximum (1023)
+        0x75, 0x0A,                     //   Report Size (10)
+        0x95, 0x02,                     //   Report Count (2)
+        0x09, 0x36,                     //   Usage (Slider)
+        0x09, 0x36,                     //   Usage (Slider)
+        0x81, 0x02,                     //   Input (variable,absolute)
+        0xC0,                            // End Collection
 };
 
 /// Battery Service Attributes Indexes
@@ -193,7 +237,7 @@ struct gatts_profile_inst {
 hidd_le_env_t hidd_le_env;
 
 // HID report map length
-uint8_t hidReportMapLen = sizeof(hidReportMap);
+uint16_t hidReportMapLen = sizeof(hidReportMap);
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 
 // HID report mapping table
@@ -219,6 +263,10 @@ static uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN] =
 static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
              { HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT };
 
+// HID Report Reference characteristic descriptor, joystick
+static uint8_t hidReportRefJoyIn[HID_REPORT_REF_LEN] =
+             { HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT };
+             
 // HID Report Reference characteristic descriptor, Feature
 static uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] =
              { HID_RPT_ID_FEATURE, HID_REPORT_TYPE_FEATURE };
@@ -398,6 +446,27 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                        ESP_GATT_PERM_READ,
                                                                        sizeof(hidReportRefKeyIn), sizeof(hidReportRefKeyIn),
                                                                        hidReportRefKeyIn}},
+        // Report Characteristic Declaration
+    [HIDD_LE_IDX_REPORT_JOY_IN_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                         ESP_GATT_PERM_READ,
+                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                         (uint8_t *)&char_prop_read_notify}},
+    // Report Characteristic Value
+    [HIDD_LE_IDX_REPORT_JOY_IN_VAL]            = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
+                                                                       NULL}},
+    // Report KEY INPUT Characteristic - Client Characteristic Configuration Descriptor
+    [HIDD_LE_IDX_REPORT_JOY_IN_CCC]              = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                      (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE),
+                                                                      sizeof(uint16_t), 0,
+                                                                      NULL}},
+     // Report Characteristic - Report Reference Descriptor
+    [HIDD_LE_IDX_REPORT_JOY_IN_REP_REF]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       sizeof(hidReportRefJoyIn), sizeof(hidReportRefJoyIn),
+                                                                       hidReportRefJoyIn}},                                                                                                                                      
+                                                                       
     // Report Characteristic Declaration
     [HIDD_LE_IDX_REPORT_CC_IN_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
                                                                          ESP_GATT_PERM_READ,
@@ -702,36 +771,43 @@ static void hid_add_id_tbl(void)
       hid_rpt_map[1].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_VAL];
       hid_rpt_map[1].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_CCC];
       hid_rpt_map[1].mode = HID_PROTOCOL_MODE_REPORT;
+      
+      // Joystick input report
+      hid_rpt_map[2].id = hidReportRefJoyIn[0];
+      hid_rpt_map[2].type = hidReportRefJoyIn[1];
+      hid_rpt_map[2].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_JOY_IN_VAL];
+      hid_rpt_map[2].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_JOY_IN_CCC];
+      hid_rpt_map[2].mode = HID_PROTOCOL_MODE_REPORT;
 
       // Consumer Control input report
-      hid_rpt_map[2].id = hidReportRefCCIn[0];
-      hid_rpt_map[2].type = hidReportRefCCIn[1];
-      hid_rpt_map[2].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_VAL];
-      hid_rpt_map[2].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_CCC];
-      hid_rpt_map[2].mode = HID_PROTOCOL_MODE_REPORT;
+      hid_rpt_map[3].id = hidReportRefCCIn[0];
+      hid_rpt_map[3].type = hidReportRefCCIn[1];
+      hid_rpt_map[3].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_VAL];
+      hid_rpt_map[3].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_CCC];
+      hid_rpt_map[3].mode = HID_PROTOCOL_MODE_REPORT;
 
       // Boot keyboard input report
       // Use same ID and type as key input report
-      hid_rpt_map[3].id = hidReportRefKeyIn[0];
-      hid_rpt_map[3].type = hidReportRefKeyIn[1];
-      hid_rpt_map[3].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_BOOT_KB_IN_REPORT_VAL];
-      hid_rpt_map[3].cccdHandle = 0;
-      hid_rpt_map[3].mode = HID_PROTOCOL_MODE_BOOT;
-
-      // Boot mouse input report
-      // Use same ID and type as mouse input report
-      hid_rpt_map[4].id = hidReportRefMouseIn[0];
-      hid_rpt_map[4].type = hidReportRefMouseIn[1];
-      hid_rpt_map[4].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_VAL];
+      hid_rpt_map[4].id = hidReportRefKeyIn[0];
+      hid_rpt_map[4].type = hidReportRefKeyIn[1];
+      hid_rpt_map[4].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_BOOT_KB_IN_REPORT_VAL];
       hid_rpt_map[4].cccdHandle = 0;
       hid_rpt_map[4].mode = HID_PROTOCOL_MODE_BOOT;
 
-      // Feature report
-      hid_rpt_map[5].id = hidReportRefFeature[0];
-      hid_rpt_map[5].type = hidReportRefFeature[1];
-      hid_rpt_map[5].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_VAL];
+      // Boot mouse input report
+      // Use same ID and type as mouse input report
+      hid_rpt_map[5].id = hidReportRefMouseIn[0];
+      hid_rpt_map[5].type = hidReportRefMouseIn[1];
+      hid_rpt_map[5].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_VAL];
       hid_rpt_map[5].cccdHandle = 0;
-      hid_rpt_map[5].mode = HID_PROTOCOL_MODE_REPORT;
+      hid_rpt_map[5].mode = HID_PROTOCOL_MODE_BOOT;
+
+      // Feature report
+      hid_rpt_map[6].id = hidReportRefFeature[0];
+      hid_rpt_map[6].type = hidReportRefFeature[1];
+      hid_rpt_map[6].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_VAL];
+      hid_rpt_map[6].cccdHandle = 0;
+      hid_rpt_map[6].mode = HID_PROTOCOL_MODE_REPORT;
 
 
   // Setup report ID map

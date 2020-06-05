@@ -480,17 +480,19 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 						kbd[5] = cmdBuffer->buf[6];
 						kbd[6] = cmdBuffer->buf[7];
 						kbd[7] = 0;
-						if(getConnID != -1)
+						if(getConnID() != -1)
 						{
 							hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
 								HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, kbd);
 						}
 					} else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
-						//ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-						if(getConnID != -1)
+						ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+						uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
+						memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
+						if(getConnID() != -1)
 						{
 							hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
-								HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT, HID_JOYSTICK_IN_RPT_LEN, &cmdBuffer->buf[2]);
+								HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT, HID_JOYSTICK_IN_RPT_LEN, joy);
 						}
 					} else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
 						hid.cmd[0] = 0x02;

@@ -298,7 +298,7 @@ static const uint16_t hid_control_point_uuid = ESP_GATT_UUID_HID_CONTROL_POINT;
 static const uint16_t hid_report_uuid = ESP_GATT_UUID_HID_REPORT;
 static const uint16_t hid_proto_mode_uuid = ESP_GATT_UUID_HID_PROTO_MODE;
 static const uint16_t hid_kb_input_uuid = ESP_GATT_UUID_HID_BT_KB_INPUT;
-static const uint16_t hid_kb_output_uuid = ESP_GATT_UUID_HID_BT_KB_OUTPUT;
+//static const uint16_t hid_kb_output_uuid = ESP_GATT_UUID_HID_BT_KB_OUTPUT;
 static const uint16_t hid_mouse_input_uuid = ESP_GATT_UUID_HID_BT_MOUSE_INPUT;
 static const uint16_t hid_repot_map_ext_desc_uuid = ESP_GATT_UUID_EXT_RPT_REF_DESCR;
 static const uint16_t hid_report_ref_descr_uuid = ESP_GATT_UUID_RPT_REF_DESCR;
@@ -502,17 +502,6 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
     [HIDD_LE_IDX_BOOT_KB_IN_REPORT_NTF_CFG]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
                                                                               (ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE),
                                                                               sizeof(uint16_t), 0,
-                                                                              NULL}},
-
-    // Boot Keyboard Output Report Characteristic Declaration
-    [HIDD_LE_IDX_BOOT_KB_OUT_REPORT_CHAR]    = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
-                                                                              ESP_GATT_PERM_READ,
-                                                                              CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
-                                                                              (uint8_t *)&char_prop_read_write}},
-    // Boot Keyboard Output Report Characteristic Value
-    [HIDD_LE_IDX_BOOT_KB_OUT_REPORT_VAL]      = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_kb_output_uuid,
-                                                                              (ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE),
-                                                                              HIDD_LE_BOOT_REPORT_MAX_LEN, 0,
                                                                               NULL}},
 
     // Boot Mouse Input Report Characteristic Declaration
@@ -772,18 +761,18 @@ static void hid_add_id_tbl(void)
       hid_rpt_map[1].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_CCC];
       hid_rpt_map[1].mode = HID_PROTOCOL_MODE_REPORT;
       
-      // Joystick input report
-      hid_rpt_map[2].id = hidReportRefJoyIn[0];
-      hid_rpt_map[2].type = hidReportRefJoyIn[1];
-      hid_rpt_map[2].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_JOY_IN_VAL];
-      hid_rpt_map[2].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_JOY_IN_CCC];
-      hid_rpt_map[2].mode = HID_PROTOCOL_MODE_REPORT;
-
       // Consumer Control input report
-      hid_rpt_map[3].id = hidReportRefCCIn[0];
-      hid_rpt_map[3].type = hidReportRefCCIn[1];
-      hid_rpt_map[3].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_VAL];
-      hid_rpt_map[3].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_CCC];
+      hid_rpt_map[2].id = hidReportRefCCIn[0];
+      hid_rpt_map[2].type = hidReportRefCCIn[1];
+      hid_rpt_map[2].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_VAL];
+      hid_rpt_map[2].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_CC_IN_CCC];
+      hid_rpt_map[2].mode = HID_PROTOCOL_MODE_REPORT;
+      
+      // Joystick input report
+      hid_rpt_map[3].id = hidReportRefJoyIn[0];
+      hid_rpt_map[3].type = hidReportRefJoyIn[1];
+      hid_rpt_map[3].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_JOY_IN_VAL];
+      hid_rpt_map[3].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_JOY_IN_CCC];
       hid_rpt_map[3].mode = HID_PROTOCOL_MODE_REPORT;
 
       // Boot keyboard input report

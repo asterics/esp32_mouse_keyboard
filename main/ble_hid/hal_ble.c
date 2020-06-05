@@ -26,10 +26,10 @@
 #define LOG_TAG "hal_ble"
 
 /** @brief Set a global log limit for this file */
-#define LOG_LEVEL_BLE ESP_LOG_WARN
+#define LOG_LEVEL_BLE ESP_LOG_DEBUG
 
 /** @brief Connection ID for an opened HID connection */
-static uint16_t hid_conn_id = 0;
+static int16_t hid_conn_id = 0;
 /** @brief Do we have a secure connection? */
 static bool sec_conn = false;
 /** @brief Bluetooth device name. */
@@ -42,7 +42,7 @@ static uint8_t hidd_service_uuid128[] = {
     0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x12, 0x18, 0x00, 0x00,
 };
 
-uint16_t getConnID()
+int16_t getConnID()
 {
 	return hid_conn_id;
 }

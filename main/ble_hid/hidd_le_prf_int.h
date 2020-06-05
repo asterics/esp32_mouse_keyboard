@@ -121,7 +121,7 @@ typedef void (*esp_hidd_event_cb_t) (esp_hidd_cb_event_t event, esp_hidd_cb_para
 #define HID_MAX_APPS                 1
 
 // Number of HID reports defined in the service
-#define HID_NUM_REPORTS          9
+#define HID_NUM_REPORTS          7
 
 // HID Report IDs for the service
 #define HID_RPT_ID_FEATURE       0  // Feature report ID
@@ -217,26 +217,24 @@ enum {
     HIDD_LE_IDX_REPORT_KEY_IN_VAL,
     HIDD_LE_IDX_REPORT_KEY_IN_CCC,
     HIDD_LE_IDX_REPORT_KEY_IN_REP_REF,
-    //Report Joystick input
-    HIDD_LE_IDX_REPORT_JOY_IN_CHAR,
-    HIDD_LE_IDX_REPORT_JOY_IN_VAL,
-    HIDD_LE_IDX_REPORT_JOY_IN_CCC,
-    HIDD_LE_IDX_REPORT_JOY_IN_REP_REF,
-    
+        
 	//report consumer control
     HIDD_LE_IDX_REPORT_CC_IN_CHAR,
     HIDD_LE_IDX_REPORT_CC_IN_VAL,
     HIDD_LE_IDX_REPORT_CC_IN_CCC,
     HIDD_LE_IDX_REPORT_CC_IN_REP_REF,
     
+    //Report Joystick input
+    HIDD_LE_IDX_REPORT_JOY_IN_CHAR,
+    HIDD_LE_IDX_REPORT_JOY_IN_VAL,
+    HIDD_LE_IDX_REPORT_JOY_IN_CCC,
+    HIDD_LE_IDX_REPORT_JOY_IN_REP_REF,
+
+    
     // Boot Keyboard Input Report
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_CHAR,
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_VAL,
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_NTF_CFG,
-
-    // Boot Keyboard Output Report
-    HIDD_LE_IDX_BOOT_KB_OUT_REPORT_CHAR,
-    HIDD_LE_IDX_BOOT_KB_OUT_REPORT_VAL,
 
     // Boot Mouse Input Report
     HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_CHAR,
@@ -247,7 +245,6 @@ enum {
     HIDD_LE_IDX_REPORT_CHAR,
     HIDD_LE_IDX_REPORT_VAL,
     HIDD_LE_IDX_REPORT_REP_REF,
-    //HIDD_LE_IDX_REPORT_NTF_CFG,
 
     HIDD_LE_IDX_NB,
 };

@@ -504,6 +504,17 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                               sizeof(uint16_t), 0,
                                                                               NULL}},
 
+    // Boot Keyboard Output Report Characteristic Declaration
+    [HIDD_LE_IDX_BOOT_KB_OUT_REPORT_CHAR]    = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                              ESP_GATT_PERM_READ,
+                                                                              CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                              (uint8_t *)&char_prop_read_write}},
+    // Boot Keyboard Output Report Characteristic Value
+    [HIDD_LE_IDX_BOOT_KB_OUT_REPORT_VAL]      = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_kb_output_uuid,
+                                                                              (ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE),
+                                                                              HIDD_LE_BOOT_REPORT_MAX_LEN, 0,
+                                                                              NULL}},
+
     // Boot Mouse Input Report Characteristic Declaration
     [HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
                                                                               ESP_GATT_PERM_READ,

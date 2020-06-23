@@ -28,11 +28,10 @@ static hid_report_map_t *hid_dev_rpt_by_id(uint8_t id, uint8_t type)
 
     for (uint8_t i = hid_dev_rpt_tbl_Len; i > 0; i--, rpt++) {
         if (rpt->id == id && rpt->type == type && rpt->mode == hidProtocolMode) {
-			//ESP_LOGI(HID_LE_PRF_TAG,"protocol mode: %d",hidProtocolMode);
             return rpt;
         }
     }
-	ESP_LOGW(HID_LE_PRF_TAG,"cannot find report");
+
     return NULL;
 }
 
@@ -47,18 +46,13 @@ void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id,
                                     uint8_t id, uint8_t type, uint8_t length, uint8_t *data)
 {
     hid_report_map_t *p_rpt;
-	ESP_LOGW(HID_LE_PRF_TAG,"IF: %d, ID: %d",gatts_if,conn_id);
+
     // get att handle for report
     if ((p_rpt = hid_dev_rpt_by_id(id, type)) != NULL) {
         // if notifications are enabled
-        #if LOG_LEVEL_BLE > ESP_LOG_DEBUG
-        ESP_LOGW(HID_LE_PRF_TAG, "%s(), send the report, handle = %d", __func__, p_rpt->handle);
-        #endif
-        ESP_LOG_BUFFER_HEX_LEVEL(HID_LE_PRF_TAG, data, length,ESP_LOG_WARN);
+        ESP_LOGD(HID_LE_PRF_TAG, "%s(), send the report, handle = %d", __func__, p_rpt->handle);
         esp_ble_gatts_send_indicate(gatts_if, conn_id, p_rpt->handle, length, data, false);
-    } else {
-		ESP_LOGE(HID_LE_PRF_TAG,"cannot find handle to send report");
-	}
+    }
     
     return;
 }

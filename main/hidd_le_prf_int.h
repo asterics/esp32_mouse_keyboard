@@ -16,94 +16,14 @@
 
 #ifndef __HID_DEVICE_LE_PRF__
 #define __HID_DEVICE_LE_PRF__
+#include <stdbool.h>
 #include "esp_gatts_api.h"
 #include "esp_gatt_defs.h"
+#include "esp_hidd_prf_api.h"
 #include "esp_gap_ble_api.h"
 #include "hid_dev.h"
 
-
-typedef enum {
-    ESP_HIDD_EVENT_REG_FINISH = 0,
-    ESP_BAT_EVENT_REG,
-    ESP_HIDD_EVENT_DEINIT_FINISH,                       
-    ESP_HIDD_EVENT_BLE_CONNECT,                         
-    ESP_HIDD_EVENT_BLE_DISCONNECT,
-    ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT,
-} esp_hidd_cb_event_t;
-
-/// HID config status
-typedef enum {
-    ESP_HIDD_STA_CONN_SUCCESS = 0x00,
-    ESP_HIDD_STA_CONN_FAIL    = 0x01,
-} esp_hidd_sta_conn_state_t;
-
-/// HID init status
-typedef enum {
-    ESP_HIDD_INIT_OK = 0,
-    ESP_HIDD_INIT_FAILED = 1,
-} esp_hidd_init_state_t;
-
-/// HID deinit status
-typedef enum {
-    ESP_HIDD_DEINIT_OK = 0,
-    ESP_HIDD_DEINIT_FAILED = 0,
-} esp_hidd_deinit_state_t;
-
-/**
- * @brief HIDD callback parameters union 
- */
-typedef union {
-    /**
-	 * @brief ESP_HIDD_EVENT_INIT_FINISH
-	 */
-    struct hidd_init_finish_evt_param {
-        esp_hidd_init_state_t state;				/*!< Initial status */
-        esp_gatt_if_t gatts_if;
-    } init_finish;							      /*!< HID callback param of ESP_HIDD_EVENT_INIT_FINISH */
-
-    /**
-	 * @brief ESP_HIDD_EVENT_DEINIT_FINISH
-	 */
-    struct hidd_deinit_finish_evt_param {
-        esp_hidd_deinit_state_t state;				/*!< De-initial status */
-    } deinit_finish;								/*!< HID callback param of ESP_HIDD_EVENT_DEINIT_FINISH */
-
-    /**
-     * @brief ESP_HIDD_EVENT_CONNECT
-	 */
-    struct hidd_connect_evt_param {
-        uint16_t conn_id;
-        esp_bd_addr_t remote_bda;                   /*!< HID Remote bluetooth connection index */
-    } connect;									    /*!< HID callback param of ESP_HIDD_EVENT_CONNECT */
-
-    /**
-     * @brief ESP_HIDD_EVENT_DISCONNECT
-	 */
-    struct hidd_disconnect_evt_param {
-        esp_bd_addr_t remote_bda;                   /*!< HID Remote bluetooth device address */
-    } disconnect;									/*!< HID callback param of ESP_HIDD_EVENT_DISCONNECT */
-
-    /**
-     * @brief ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT
-	 */
-    struct hidd_vendor_write_evt_param {
-        uint16_t conn_id;                           /*!< HID connection index */
-        uint16_t report_id;                         /*!< HID report index */
-        uint16_t length;                            /*!< data length */
-        uint8_t  *data;                             /*!< The pointer to the data */
-    } vendor_write;									/*!< HID callback param of ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT */
-
-} esp_hidd_cb_param_t;
-
-
-/**
- * @brief HID device event callback function type
- * @param event : Event type
- * @param param : Point to callback parameter, currently is union type
- */
-typedef void (*esp_hidd_event_cb_t) (esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
-
-
+#define SUPPORT_REPORT_VENDOR                 false
 //HID BLE profile log tag
 #define HID_LE_PRF_TAG                        "HID_LE_PRF"
 
@@ -121,14 +41,15 @@ typedef void (*esp_hidd_event_cb_t) (esp_hidd_cb_event_t event, esp_hidd_cb_para
 #define HID_MAX_APPS                 1
 
 // Number of HID reports defined in the service
-#define HID_NUM_REPORTS          7
+#define HID_NUM_REPORTS          9
 
 // HID Report IDs for the service
-#define HID_RPT_ID_FEATURE       0  // Feature report ID
 #define HID_RPT_ID_MOUSE_IN      1   // Mouse input report ID
 #define HID_RPT_ID_KEY_IN        2   // Keyboard input report ID
 #define HID_RPT_ID_CC_IN         3   //Consumer Control input report ID
-#define HID_RPT_ID_JOY_IN        4   // Joystick input report ID
+#define HID_RPT_ID_VENDOR_OUT    4   // Vendor output report ID
+#define HID_RPT_ID_LED_OUT       0  // LED output report ID
+#define HID_RPT_ID_FEATURE       0  // Feature report ID
 
 #define HIDD_APP_ID			0x1812//ATT_SVC_HID
 
@@ -217,24 +138,30 @@ enum {
     HIDD_LE_IDX_REPORT_KEY_IN_VAL,
     HIDD_LE_IDX_REPORT_KEY_IN_CCC,
     HIDD_LE_IDX_REPORT_KEY_IN_REP_REF,
-        
-	//report consumer control
+    ///Report Led output
+    HIDD_LE_IDX_REPORT_LED_OUT_CHAR,
+    HIDD_LE_IDX_REPORT_LED_OUT_VAL,
+    HIDD_LE_IDX_REPORT_LED_OUT_REP_REF,
+
+#if (SUPPORT_REPORT_VENDOR  == true)
+    /// Report Vendor
+    HIDD_LE_IDX_REPORT_VENDOR_OUT_CHAR,
+    HIDD_LE_IDX_REPORT_VENDOR_OUT_VAL,
+    HIDD_LE_IDX_REPORT_VENDOR_OUT_REP_REF,
+#endif
     HIDD_LE_IDX_REPORT_CC_IN_CHAR,
     HIDD_LE_IDX_REPORT_CC_IN_VAL,
     HIDD_LE_IDX_REPORT_CC_IN_CCC,
     HIDD_LE_IDX_REPORT_CC_IN_REP_REF,
     
-    //Report Joystick input
-    HIDD_LE_IDX_REPORT_JOY_IN_CHAR,
-    HIDD_LE_IDX_REPORT_JOY_IN_VAL,
-    HIDD_LE_IDX_REPORT_JOY_IN_CCC,
-    HIDD_LE_IDX_REPORT_JOY_IN_REP_REF,
-
-    
     // Boot Keyboard Input Report
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_CHAR,
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_VAL,
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_NTF_CFG,
+
+    // Boot Keyboard Output Report
+    HIDD_LE_IDX_BOOT_KB_OUT_REPORT_CHAR,
+    HIDD_LE_IDX_BOOT_KB_OUT_REPORT_VAL,
 
     // Boot Mouse Input Report
     HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_CHAR,
@@ -245,6 +172,7 @@ enum {
     HIDD_LE_IDX_REPORT_CHAR,
     HIDD_LE_IDX_REPORT_VAL,
     HIDD_LE_IDX_REPORT_REP_REF,
+    //HIDD_LE_IDX_REPORT_NTF_CFG,
 
     HIDD_LE_IDX_NB,
 };

@@ -106,6 +106,8 @@ struct cmdBuf {
 	uint8_t buf[MAX_CMDLEN];
 };
 
+static uint8_t manufacturer[19]={'A', 's', 'T', 'e', 'R', 'I', 'C', 'S', ' ', 'F', 'o', 'u', 'n', 'd', 'a', 't', 'i', 'o', 'n'};
+
 
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
@@ -117,7 +119,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
     .include_txpower = true,
-    .min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
+    .min_interval = 0x000A, //slave connection min interval, Time = min_interval * 1.25 msec
     .max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
     .appearance = 0x03c0,       //HID Generic,
     .manufacturer_len = 0,
@@ -127,6 +129,15 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .service_uuid_len = sizeof(hidd_service_uuid128),
     .p_service_uuid = hidd_service_uuid128,
     .flag = 0x6,
+};
+
+// config scan response data
+///@todo Scan response is currently not used. If used, add state handling (adv start) according to ble/gatt_security_server example of Espressif
+static esp_ble_adv_data_t hidd_adv_resp = {
+    .set_scan_rsp = true,
+    .include_name = true,
+    .manufacturer_len = sizeof(manufacturer),
+    .p_manufacturer_data = manufacturer,
 };
 
 static esp_ble_adv_params_t hidd_adv_params = {

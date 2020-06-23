@@ -50,6 +50,11 @@ esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks)
     if((hidd_status = esp_ble_gatts_app_register(HIDD_APP_ID)) != ESP_OK) {
         return hidd_status;
     }
+    
+    hidd_status = esp_ble_gatt_set_local_mtu(23);
+    if (hidd_status != ESP_OK){
+        ESP_LOGE(HID_LE_PRF_TAG, "set local  MTU failed, error code = %x", hidd_status);
+    }
    
     return hidd_status;
 }

@@ -17,6 +17,7 @@
 
 #include "esp_bt_defs.h"
 #include "esp_gatt_defs.h"
+#include "esp_gatt_common_api.h"
 #include "esp_err.h"
 
 #ifdef __cplusplus

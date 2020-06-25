@@ -269,6 +269,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $PMx (0 or 1)
     // $GP
     // $DPx (number of paired device, starting with 0)
+    // $NAME set name of bluetooth device
     
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function

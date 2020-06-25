@@ -51,10 +51,11 @@ esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks)
         return hidd_status;
     }
     
-    hidd_status = esp_ble_gatt_set_local_mtu(23);
+    ///@note It seems that the MTU has no effect on compatibility. The BLE stack works with all systems without setting the MTU to 23Bytes.
+    /*hidd_status = esp_ble_gatt_set_local_mtu(23);
     if (hidd_status != ESP_OK){
         ESP_LOGE(HID_LE_PRF_TAG, "set local  MTU failed, error code = %x", hidd_status);
-    }
+    }*/
    
     return hidd_status;
 }

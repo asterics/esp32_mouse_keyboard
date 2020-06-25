@@ -1,6 +1,33 @@
 # ESP32 Mouse/Keyboard for BLE HID
 ESP32 implementation for HID over GATT Keyboard and Mouse (Bluetooth Low Energy). Including serial API for external modules (compatible to Adafruit EZKey HID).
 
+## Compatibility
+
+Due to the wide variety of hardware & software combinations, it is hard to guarantee compatibility.
+Nevertheless, we try to test this project with as much devices as possible.
+
+Tested devices by the AsTeRICS team:
+
+|    Device    | Mouse | Keyboard |
+|--------------|-------|----------|
+|PC with CSR 4.0 BT dongle, Debian Bullseye | yes | yes |
+|Lenovo T440s, Debian Buster | yes | yes |
+|PC with CSR 4.0 BT dongle, Win10 Build 2004 | yes | yes |
+|Lenovo T440s, Win10 Build 2004 in VirtualBox | no | no |
+|Xiaomi Mi A1 - LineageOS 16.0 (Android 9) | yes | yes |
+|Asus Nexus 7 (2013) - Android 6.0.1 | yes | yes | 
+|iPad Air 2 (MGL12FD/A9 - iOS 13.3.1 | yes (Assistive Touch) | yes (Text input & accessible switch interface) |
+|iPad Air 2 (MGL12FD/A9 - iOS 13.3.1 | yes (Assistive Touch) | yes (Text input & accessible switch interface) |
+|iPad Pro 10.5" (MPHG2TY/A) - iOS 13.5.1 | yes (Assistive Touch) | yes (Text input & accessible switch interface) |
+|iPad 6th Gen (MR7J2FD/A) - iOS 13.5.1 | yes (Assistive Touch) | yes (Text input & accessible switch interface) |
+
+
+_Note:_ On some iPad devices, there might show up a notification in the Bluetooth menu, that this device may affect WiFi or Bluetooth performance.
+You could ignore this error, according to [StackOverflow](https://apple.stackexchange.com/questions/386589/what-does-using-mx-anywhere-2s-may-affect-wi-fi-and-bluetooth-connectivity-mea) there is no clear
+reason for this message, maybe it is related to the additional WiFi interface of the ESP32 (other user report this error if a normal mouse has an additional USB-dongle).
+
+_Note:_ If you can report a working device, we would be happy to add a list of community tested devices, just open an issue with the label __device-testreport__.
+
 ## Building the ESP32 firmware
 
 Please follow the step-by-step instructions of Espressif's ESP-IDF manual to setup the build infrastructure:

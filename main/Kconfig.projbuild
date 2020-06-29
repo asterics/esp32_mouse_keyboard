@@ -1,0 +1,100 @@
+menu "esp32_mouse_keyboard - FLipMouse & FABI config (CURRENTLY UNUSED!!!!)"
+
+	config MODULE_RX_PIN
+		int "RX pin for command/HID UART"
+		default 17
+        range 1 25
+        
+	config MODULE_TX_PIN
+		int "TX pin for command/HID UART"
+		default 16
+        range 1 25
+    
+    config MODULE_UART_NR
+		int "UART interface number"
+		default 2
+		range 1 2
+		
+	config MODULE_USEKEYBOARD
+		bool "Enable BLE-HID keyboard"
+		default y
+		help
+			Enable the Keyboard interface for Bluetooth.
+			
+	config MODULE_USEMOUSE
+		depends on MODULE_USEKEYBOARD
+		bool "Enable BLE-HID mouse"
+		default y
+		help
+			Enable the Mouse interface for Bluetooth.
+			
+	config MODULE_USEABSOLUTEMOUSE
+		depends on MODULE_USEMOUSE
+		bool "Use absolute mouse instead of classic relative mouse"
+		default n
+		help
+			If enabled, the normal relative mouse is replaced with an
+			absolute mouse descriptor. Please note, that a different mouse
+			input data is used if enabled (we need int16_t for x and y).
+			
+	config MODULE_USEJOYSTICK
+		depends on MODULE_USEMOUSE
+		bool "Enable BLE-HID joystick"
+		default n
+		help
+			Enable the Joystick interface for Bluetooth.
+			
+	config MODULE_BT_PAIRING
+		bool "Disable pairing by default, enabled by command"
+		default n
+		help
+			If enabled, the module denies pairing requests by default.
+			It is possible to enable the pairing by sending the pairing en-/disable command
+			via the serial interface.
+		
+
+	config USE_AS_FLIPMOUSE_FABI
+		bool "Use project as FLipMouse/FABI Bluetooth module"
+		default n
+		help
+			If this option is enabled, a FLipMouse/FABI Bluetooth module
+			is built. If disabled, this project acts as demo code for Bluetooth
+			HID code.
+	menu "FLipMouse / FABI configuration"
+		visible if USE_AS_FLIPMOUSE_FABI
+		
+		choice MODULE_TYPE
+			prompt "Module type (FLipMouse/FABI)"
+			depends on USE_AS_FLIPMOUSE_FABI
+            help
+                Specify the module type (FLipMouse or FABI).
+                
+            config MODULE_FLIPMOUSE
+                bool "FLipMouse"
+
+            config MODULE_FABI
+                bool "FABI"
+		endchoice
+		
+		config FM_WEBGUI
+			bool "Enable WebGUI"
+			default n
+			help
+				Enable the WebGUI for the FLipMouse in the ESP32.
+		
+		config FM_OTA
+			depends on MODULE_FLIPMOUSE
+			bool "Enable programming via Teensy"
+			default n
+			help
+				Enable the update functionality via the Teensy module.
+		
+		config FABI_OTA
+			depends on MODULE_FABI
+			bool "Enable programming via ArduinoProMicro"
+			default n
+			help
+				Enable the update functionality via the Arduino Pro Micro module.
+		
+	endmenu
+endmenu

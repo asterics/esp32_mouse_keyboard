@@ -223,21 +223,6 @@ typedef uint8_t consumer_cmd_t;
 #define HID_CC_RPT_SET_SELECTION(s, x)  (s)[1] &= HID_CC_RPT_SELECTION_BITS; \
                                         (s)[1] |= ((x) & 0x03) << 4
 
-// HID keyboard input report length
-#define HID_KEYBOARD_IN_RPT_LEN     7
-
-// HID keyboard input report length
-#define HID_JOYSTICK_IN_RPT_LEN     12
-
-// HID LED output report length
-#define HID_LED_OUT_RPT_LEN         1
-
-// HID mouse input report length
-#define HID_MOUSE_IN_RPT_LEN        5
-
-// HID consumer control input report length
-#define HID_CC_IN_RPT_LEN           2
-
 
 // HID report mapping table
 typedef struct
@@ -264,9 +249,9 @@ void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id,
 
 void hid_consumer_build_report(uint8_t *buffer, consumer_cmd_t cmd);
 
-#ifdef __cplusplus
-}
-#endif
+void hid_keyboard_build_report(uint8_t *buffer, keyboard_cmd_t cmd);
+
+void hid_mouse_build_report(uint8_t *buffer, mouse_cmd_t cmd);
 
 #endif /* HID_DEV_H__ */
 

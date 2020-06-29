@@ -14,9 +14,24 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
  * 
- * Copyright 2017 Benjamin Aigner <beni@asterics-foundation.org>
+ * 
+ * Copyright 2020, Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>
+ * 
+ * This file is mostly based on the Espressif ESP32 BLE HID example.
+ * Adaption were made for:
+ * * UART interface
+ * * console input for testing purposes
+ * * Joystick support (replacing vendor report)
+ * * command input via UART for controlling the BLE interface (get & delete pairings,...)
+ * 
  */
-
+ 
+/* Original license text:
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+   Unless required by applicable law or agreed to in writing, this software is 
+   distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR  
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,92 +45,55 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
-#include "driver/gpio.h"
 
-#include "config.h"
-#include "ble_hid/hal_ble.h"
-#include "ble_hid/hid_dev.h"
-
+#include "esp_hidd_prf_api.h"
+#include "esp_bt_defs.h"
 #include "esp_gap_ble_api.h"
-//#include "esp_hidd_prf_api.h"
-/*#include "esp_bt_defs.h"
 #include "esp_gatts_api.h"
 #include "esp_gatt_defs.h"
 #include "esp_bt_main.h"
-#include "esp_bt_device.h"*/
+#include "esp_bt_device.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
-//#include "hid_dev.h"
-#include "keyboard.h"
+#include "hid_dev.h"
+#include "config.h"
 
-/** demo mouse speed */
+/**
+ * Brief:
+ * This example Implemented BLE HID device profile related functions, in which the HID device
+ * has 4 Reports (1 is mouse, 2 is keyboard and LED, 3 is Consumer Devices, 4 is Vendor devices).
+ * Users can choose different reports according to their own application scenarios.
+ * BLE HID profile inheritance and USB HID class.
+ */
+
+/** 
+ * Note:
+ * 1. Win10 does not support vendor report , So SUPPORT_REPORT_VENDOR is always set to FALSE, it defines in hidd_le_prf_int.h
+ * 2. Update connection parameters are not allowed during iPhone HID encryption, slave turns 
+ * off the ability to automatically update connection parameters during encryption.
+ * 3. After our HID device is connected, the iPhones write 1 to the Report Characteristic Configuration Descriptor, 
+ * even if the HID encryption is not completed. This should actually be written 1 after the HID encryption is completed.
+ * we modify the permissions of the Report Characteristic Configuration Descriptor to `ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE_ENCRYPTED`.
+ * if you got `GATT_INSUF_ENCRYPTION` error, please ignore.
+ */
+
+#define HID_DEMO_TAG "HID_DEMO"
+
+
+static uint16_t hid_conn_id = 0;
+static bool sec_conn = false;
+static bool send_volum_up = false;
+#define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
+
+static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
+
 #define MOUSE_SPEED 30
 #define MAX_CMDLEN  100
 
 #define EXT_UART_TAG "EXT_UART"
 #define CONSOLE_UART_TAG "CONSOLE_UART"
 
-
-static uint8_t keycode_modifier=0;
-static uint8_t keycode_deadkey_first=0;
-//static joystick_data_t joystick;//currently unused, no joystick implemented
 static config_data_t config;
-QueueHandle_t hid_ble;
-
-
-void update_config()
-{
-    nvs_handle my_handle;
-    esp_err_t err = nvs_open("config_c", NVS_READWRITE, &my_handle);
-    if(err != ESP_OK) ESP_LOGE("MAIN","error opening NVS");
-    err = nvs_set_str(my_handle, "btname", config.bt_device_name);
-    if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - bt name");
-    err = nvs_set_u8(my_handle, "locale", config.locale);
-    if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - locale");
-    printf("Committing updates in NVS ... ");
-    err = nvs_commit(my_handle);
-    printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
-    nvs_close(my_handle);
-}
-
-
-void sendKeyCode(uint8_t c, uint8_t type) {
-    hid_cmd_t keyboardCmd;
-    if(keycode_modifier != 0)
-    {
-        keyboardCmd.cmd[0] = 0x25;
-        keyboardCmd.cmd[1] = keycode_modifier;
-        xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
-    }
-    keyboardCmd.cmd[0] = type;
-    keyboardCmd.cmd[1] = c;
-	xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
-    if(keycode_modifier != 0)
-    {
-        keyboardCmd.cmd[0] = 0x26;
-        keyboardCmd.cmd[1] = keycode_modifier;
-        xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
-    }
-    keycode_modifier = 0;
-}
-
-void sendKey(uint8_t c, uint8_t type) {
-    uint8_t keycode;
-	keycode = parse_for_keycode(c,config.locale,&keycode_modifier,&keycode_deadkey_first); //send current byte to parser
-	if(keycode == 0) 
-	{
-		ESP_LOGI(EXT_UART_TAG,"keycode is 0 for 0x%X, skipping to next byte",c);
-		return; //if no keycode is found,skip to next byte (might be a 16bit UTF8)
-	}
-	ESP_LOGI(EXT_UART_TAG,"keycode: %d, modifier: %d, deadkey: %d",keycode,keycode_modifier,keycode_deadkey_first);
-	//TODO: do deadkey sequence...
-		//if a keycode is found, add to keycodes for HID
-	sendKeyCode(keycode, type);
-}
-
-
-
-
 
 #define CMDSTATE_IDLE 0
 #define CMDSTATE_GET_RAW 1
@@ -126,7 +104,52 @@ struct cmdBuf {
 	int expectedBytes;
 	int bufferLength;
 	uint8_t buf[MAX_CMDLEN];
-} ;
+};
+
+static uint8_t manufacturer[19]={'A', 's', 'T', 'e', 'R', 'I', 'C', 'S', ' ', 'F', 'o', 'u', 'n', 'd', 'a', 't', 'i', 'o', 'n'};
+
+
+static uint8_t hidd_service_uuid128[] = {
+    /* LSB <--------------------------------------------------------------------------------> MSB */
+    //first uuid, 16bit, [12],[13] is the value
+    0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x12, 0x18, 0x00, 0x00,
+};
+
+static esp_ble_adv_data_t hidd_adv_data = {
+    .set_scan_rsp = false,
+    .include_name = true,
+    .include_txpower = true,
+    .min_interval = 0x000A, //slave connection min interval, Time = min_interval * 1.25 msec
+    .max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
+    .appearance = 0x03c0,       //HID Generic,
+    .manufacturer_len = 0,
+    .p_manufacturer_data =  NULL,
+    .service_data_len = 0,
+    .p_service_data = NULL,
+    .service_uuid_len = sizeof(hidd_service_uuid128),
+    .p_service_uuid = hidd_service_uuid128,
+    .flag = 0x6,
+};
+
+// config scan response data
+///@todo Scan response is currently not used. If used, add state handling (adv start) according to ble/gatt_security_server example of Espressif
+static esp_ble_adv_data_t hidd_adv_resp = {
+    .set_scan_rsp = true,
+    .include_name = true,
+    .manufacturer_len = sizeof(manufacturer),
+    .p_manufacturer_data = manufacturer,
+};
+
+static esp_ble_adv_params_t hidd_adv_params = {
+    .adv_int_min        = 0x20,
+    .adv_int_max        = 0x30,
+    .adv_type           = ADV_TYPE_IND,
+    .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+    //.peer_addr            =
+    //.peer_addr_type       =
+    .channel_map        = ADV_CHNL_ALL,
+    .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
 
 uint8_t uppercase(uint8_t c) 
 {
@@ -154,6 +177,91 @@ int get_int(const char * input, int index, int * value)
 }
 
 
+void update_config()
+{
+    nvs_handle my_handle;
+    esp_err_t err = nvs_open("config_c", NVS_READWRITE, &my_handle);
+    if(err != ESP_OK) ESP_LOGE("MAIN","error opening NVS");
+    err = nvs_set_str(my_handle, "btname", config.bt_device_name);
+    if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - bt name");
+    err = nvs_set_u8(my_handle, "locale", config.locale);
+    if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - locale");
+    printf("Committing updates in NVS ... ");
+    err = nvs_commit(my_handle);
+    printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+    nvs_close(my_handle);
+}
+
+
+static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param)
+{
+    switch(event) {
+        case ESP_HIDD_EVENT_REG_FINISH: {
+            if (param->init_finish.state == ESP_HIDD_INIT_OK) {
+                //esp_bd_addr_t rand_addr = {0x04,0x11,0x11,0x11,0x11,0x05};
+                esp_ble_gap_set_device_name(config.bt_device_name);
+                esp_ble_gap_config_adv_data(&hidd_adv_data);
+                
+            }
+            break;
+        }
+        case ESP_BAT_EVENT_REG: {
+            break;
+        }
+        case ESP_HIDD_EVENT_DEINIT_FINISH:
+	     break;
+		case ESP_HIDD_EVENT_BLE_CONNECT: {
+            ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
+            hid_conn_id = param->connect.conn_id;
+            break;
+        }
+        case ESP_HIDD_EVENT_BLE_DISCONNECT: {
+            sec_conn = false;
+            ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+            esp_ble_gap_start_advertising(&hidd_adv_params);
+            break;
+        }
+        case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT: {
+            ESP_LOGI(HID_DEMO_TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT", __func__);
+            ESP_LOG_BUFFER_HEX(HID_DEMO_TAG, param->vendor_write.data, param->vendor_write.length);
+        }    
+        default:
+            break;
+    }
+    return;
+}
+
+static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+{
+    switch (event) {
+    case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+        esp_ble_gap_start_advertising(&hidd_adv_params);
+        break;
+     case ESP_GAP_BLE_SEC_REQ_EVT:
+        for(int i = 0; i < ESP_BD_ADDR_LEN; i++) {
+             ESP_LOGD(HID_DEMO_TAG, "%x:",param->ble_security.ble_req.bd_addr[i]);
+        }
+        esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
+	 break;
+     case ESP_GAP_BLE_AUTH_CMPL_EVT:
+        sec_conn = true;
+        esp_bd_addr_t bd_addr;
+        memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
+        ESP_LOGI(HID_DEMO_TAG, "remote BD_ADDR: %08x%04x",\
+                (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) + bd_addr[3],
+                (bd_addr[4] << 8) + bd_addr[5]);
+        ESP_LOGI(HID_DEMO_TAG, "address type = %d", param->ble_security.auth_cmpl.addr_type);
+        ESP_LOGI(HID_DEMO_TAG, "pair status = %s",param->ble_security.auth_cmpl.success ? "success" : "fail");
+        if(!param->ble_security.auth_cmpl.success) {
+            ESP_LOGE(HID_DEMO_TAG, "fail reason = 0x%x",param->ble_security.auth_cmpl.fail_reason);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+
 void processCommand(struct cmdBuf *cmdBuffer)
 {
     //commands:
@@ -161,16 +269,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $PMx (0 or 1)
     // $GP
     // $DPx (number of paired device, starting with 0)
-    // $KW (+layouts)
-    // $KD/KU
-    // $KR
-    // $KL
-    // $M
-    // $KC
-    
-    // TBD:
-    // $KK (if necessary)
-    // joystick (everything)
+    // $NAME set name of bluetooth device
     
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -223,144 +322,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
         } else ESP_LOGE(EXT_UART_TAG,"error getting bonded devices count or no devices bonded");
         return;
     }
-    
-    //joystick: update data (send a report)
-    if(strcmp(input,"JU") == 0) 
-    {
-        //TBD: joystick
-        ESP_LOGD(EXT_UART_TAG,"TBD! joystick: send report (JU)");
-        return;
-    }
-    
-    //keyboard: release all
-    if(strcmp(input,"KR") == 0)
-    {
-		sendKeyCode(0, 0x2F);
-        ESP_LOGD(EXT_UART_TAG,"keyboard: release all (KR)");
-        return;
-    }
-    
-    /**++++ commands with parameters ++++*/    
-    switch(input[0])
-    {
-        case 'K': //keyboard
-        {
-			int param=0;
-			if ((input[1] == 'U') || (input[1] == 'D') || (input[1] == 'L'))
-			{
-				if (!get_int(input,2,&param)) {
-					ESP_LOGE(EXT_UART_TAG,"Keyboad command parameter needs integer format");
-					break;
-				}
-			}
-
-            //key up
-            if(input[1] == 'U')
-            {
-                sendKeyCode(param, 0x22);
-                return;
-            }
-            //key down
-            if(input[1] == 'D') 
-            {
-                sendKeyCode(param, 0x21);
-                return;
-            }
-            //keyboard, set locale
-            if(input[1] == 'L') 
-            { 
-				if(param < LAYOUT_MAX)   {
-					config.locale = param;
-					update_config();
-				} else ESP_LOGE(EXT_UART_TAG,"Locale number out of range");
-                return;
-            }
-            
-            //keyboard, write
-            if(input[1] == 'W')
-            {
-                ESP_LOGI(EXT_UART_TAG,"sending keyboard write, len: %d (bytes, not characters!)",len-2);
-                for(uint16_t i = 2; i<len; i++)
-                {
-                    if(input[i] == '\0') 
-                    {
-                        ESP_LOGI(EXT_UART_TAG,"terminated string, ending KW");
-                        break;
-                    }
-                    sendKey(input[i],0x20);
-                }
-                return;
-            }
-            
-            //keyboard, get keycode for unicode bytes
-            if(input[1] == 'C' && len == 4) 
-            {
-                keycode = get_keycode(input[2],config.locale,&keycode_modifier,&keycode_deadkey_first);
-                //if the first byte is not sufficient, try with second byte.
-                if(keycode == 0) 
-                { 
-                    keycode = get_keycode(input[3],config.locale,&keycode_modifier,&keycode_deadkey_first);
-                }
-                //first the keycode + modifier are sent.
-                //deadkey starting key is sent afterwards (0 if not necessary)
-                uart_write_bytes(EX_UART_NUM, (char *)&keycode, sizeof(keycode));
-                uart_write_bytes(EX_UART_NUM, (char *)&keycode_modifier, sizeof(keycode_modifier));
-                uart_write_bytes(EX_UART_NUM, (char *)&keycode_deadkey_first, sizeof(keycode_deadkey_first));
-                uart_write_bytes(EX_UART_NUM, &nl, sizeof(nl));
-                return;
-            }
-            //keyboard, get unicode mapping between 2 locales
-            if(input[1] == 'K' && len == 6) 
-            { 
-                //cpoint = get_cpoint((input[2] << 8) || input[3],input[4],input[5]);
-                //uart_write_bytes(EX_UART_NUM, (char *)&cpoint, sizeof(cpoint));
-                //uart_write_bytes(EX_UART_NUM, &nl, sizeof(nl));
-                //TODO: is this necessary or useful anyway??
-                return;
-            }
-            break;
-		}
-        case 'J': //joystick
-            //joystick, set X,Y,Z (each 0-1023)
-            if(input[1] == 'S' && len == 8) { }
-            //joystick, set Z rotate, slider left, slider right (each 0-1023)
-            if(input[1] == 'T' && len == 8) { }
-            //joystick, set buttons (bitmap for button nr 1-16)
-            if(input[1] == 'B' && len == 4) { }
-            //joystick, set hat (0-360°)
-            if(input[1] == 'H' && len == 4) { }
-            //TBD: joystick
-            ESP_LOGD(EXT_UART_TAG,"TBD! joystick");
-            break;
-        
-        default: //test for management commands
-            break;
-    }
-
-    // M <buttons> <X> <Y> <wheel>
-    // create mouse activity
-    if(input[0] == 'M')
-    {
-		int index=1, value;
-		int buttons, x;
-		hid_cmd_t mouseCmd;
-
-		mouseCmd.cmd[0] = 0x02; 
-		if ((index=get_int(input,index,&value))) mouseCmd.cmd[1] = value; else return;
-		if ((index=get_int(input,index,&value))) mouseCmd.cmd[2] = value; else return;
-		buttons = mouseCmd.cmd[1];
-		x = mouseCmd.cmd[2];
-		xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-		
-		mouseCmd.cmd[0] = 0x03; 
-		if ((index=get_int(input,index,&value))) mouseCmd.cmd[1] = value; else return;
-		if ((index=get_int(input,index,&value))) mouseCmd.cmd[2] = value; else return;
-		xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-		
-        //xQueueSend(mouse_q,(void *)&mouseCmd, (TickType_t) 0);
-        ESP_LOGI(EXT_UART_TAG,"mouse command: %d,%d,%d,%d",buttons,x,mouseCmd.cmd[1],mouseCmd.cmd[2]);
-        return;
-    }
+   
     
     //DP: delete one pairing
     if(input[0] == 'D' && input[1] == 'P')
@@ -399,29 +361,6 @@ void processCommand(struct cmdBuf *cmdBuffer)
         return;
     }
 
-    //PM: enable/disable advertisting/pairing
-    if(input[0] == 'P' && input[1] == 'M')
-    {
-		int param;
-		if (!(get_int(input,2,&param))) { 
-			ESP_LOGE(EXT_UART_TAG,"PM: invalid parameter, need integer");
-			return;
-		}
-		
-        if(param == 0)
-        {
-            halBLESetPairing(0);
-            ESP_LOGI(EXT_UART_TAG,"PM: pairing deactivated");
-
-        } else if(param == 1) 
-        {
-            halBLESetPairing(1);
-            ESP_LOGI(EXT_UART_TAG,"PM: pairing activated");
-
-        } else ESP_LOGE(EXT_UART_TAG,"PM: parameter error, either 0 or 1");
-        return;
-    }
-    
     //set BT GATT advertising name
     if(strncmp(input,"NAME ", 5) == 0) 
     {
@@ -438,164 +377,71 @@ void processCommand(struct cmdBuf *cmdBuffer)
     ESP_LOGE(EXT_UART_TAG,"No command executed with: %s ; len= %d\n",input,len);
 }
 
-
-
 void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 {
-    static uint8_t keycode = 0;
-    hid_cmd_t hid;
-    
     switch (cmdBuffer->state) {
 		
 		case CMDSTATE_IDLE:  
-				if (character==0xfd) {
-					cmdBuffer->bufferLength=0;
-					cmdBuffer->expectedBytes=8;   // 8 bytes for raw report size
-					cmdBuffer->state=CMDSTATE_GET_RAW;
-				}
-				else if (character == '$') {
-					cmdBuffer->bufferLength=0;   // we will read an ASCII-command until CR or LF  
-					cmdBuffer->state=CMDSTATE_GET_ASCII;
-				}
-				else sendKey(character, 0x20);         // treat whatever comes in as keyboard output
-				break;
+			if (character==0xfd) {
+				cmdBuffer->bufferLength=0;
+				cmdBuffer->expectedBytes=8;   // 8 bytes for raw report size
+				cmdBuffer->state=CMDSTATE_GET_RAW;
+			}
+			else if (character == '$') {
+				cmdBuffer->bufferLength=0;   // we will read an ASCII-command until CR or LF  
+				cmdBuffer->state=CMDSTATE_GET_ASCII;
+			}
+			break;
 							
 		case CMDSTATE_GET_RAW:
-				cmdBuffer->buf[cmdBuffer->bufferLength]=character;
-				//if ((cmdBuffer->bufferLength == 1) && (character==0x00))  // we have a keyboard report: increase by 2 bytes
-				  // cmdBuffer->expectedBytes += 2;
+			cmdBuffer->buf[cmdBuffer->bufferLength]=character;
+			if ((cmdBuffer->bufferLength == 1) && (character==0x01)) { // we have a joystick report: increase by 4 bytes
+			   cmdBuffer->expectedBytes += 6;
+			   //ESP_LOGI(EXT_UART_TAG,"expecting 4 more bytes for joystick");
+		    }
 
-				cmdBuffer->bufferLength++;
-				cmdBuffer->expectedBytes--;
-				if (!cmdBuffer->expectedBytes) {
-					if (cmdBuffer->buf[1] == 0x00) {   // keyboard report				
-						uint8_t kbd[HID_KEYBOARD_IN_RPT_LEN];
-						kbd[0] = cmdBuffer->buf[0];
-						kbd[1] = cmdBuffer->buf[2];
-						kbd[2] = cmdBuffer->buf[3];
-						kbd[3] = cmdBuffer->buf[4];
-						kbd[4] = cmdBuffer->buf[5];
-						kbd[5] = cmdBuffer->buf[6];
-						kbd[6] = cmdBuffer->buf[7];
-						kbd[7] = 0;
-						hid_dev_send_report(hidd_le_env.gatt_if, getConnID(),
-							HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, kbd);
+			cmdBuffer->bufferLength++;
+			cmdBuffer->expectedBytes--;
+			if (!cmdBuffer->expectedBytes) {
+				if(sec_conn == false) {
+					ESP_LOGI(EXT_UART_TAG,"not connected, cannot send report");
+				} else {
+					if (cmdBuffer->buf[1] == 0x00) {   // keyboard report	
+						esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+					} else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
+						ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+						//uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
+						//memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
+						///@todo esp_hidd_send_joystick_value...
 					} else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
-						hid.cmd[0] = 0x02;
-						hid.cmd[1] = cmdBuffer->buf[2]; //buttons
-						hid.cmd[2] = cmdBuffer->buf[3]; //X
-						xQueueSend(hid_ble,(void *)&hid, (TickType_t) 2);
-						hid.cmd[0] = 0x03;
-						hid.cmd[1] = cmdBuffer->buf[4]; //Y
-						hid.cmd[2] = cmdBuffer->buf[5]; //wheel
-						xQueueSend(hid_ble,(void *)&hid, (TickType_t) 2);
+						esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
 					}
-                    else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
-                    cmdBuffer->state=CMDSTATE_IDLE;
+					else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
 				}
-				break;
+				cmdBuffer->state=CMDSTATE_IDLE;
+			}
+			break;
 				
 		case CMDSTATE_GET_ASCII:
-				if (character=='$')  {   //  key '$' can be created by sending "$$" 
-					sendKey('$', 0x20);
-					cmdBuffer->state=CMDSTATE_IDLE;
-				} else {   // collect a command string until CR or LF are received
-					if ((character==0x0d) || (character==0x0a))  {
-						cmdBuffer->buf[cmdBuffer->bufferLength]=0;
-						ESP_LOGI(EXT_UART_TAG,"sending command to parser: %s",cmdBuffer->buf);
+			// collect a command string until CR or LF are received
+			if ((character==0x0d) || (character==0x0a))  {
+				cmdBuffer->buf[cmdBuffer->bufferLength]=0;
+				ESP_LOGI(EXT_UART_TAG,"sending command to parser: %s",cmdBuffer->buf);
 
-						processCommand(cmdBuffer);
-						cmdBuffer->state=CMDSTATE_IDLE;
-					} else {
-						if (cmdBuffer->bufferLength < MAX_CMDLEN-1) 
-						  cmdBuffer->buf[cmdBuffer->bufferLength++]=character;
-					}
-				}
-				break;
+				processCommand(cmdBuffer);
+				cmdBuffer->state=CMDSTATE_IDLE;
+			} else {
+				if (cmdBuffer->bufferLength < MAX_CMDLEN-1) 
+				  cmdBuffer->buf[cmdBuffer->bufferLength++]=character;
+			}
+			break;
 		default: 
  			cmdBuffer->state=CMDSTATE_IDLE;
 	}
-} 
-					
-
-
-void uart_console(void *pvParameters)
-{
-    char character;
-	hid_cmd_t mouseCmd;
-	hid_cmd_t keyboardCmd;
-    
-    //Install UART driver, and get the queue.
-    uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
-
-    ESP_LOGI("UART","console UART processing task started");
-    
-    while(1)
-    {
-        // read single byte
-        uart_read_bytes(CONSOLE_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
-		// uart_parse_command(character, &cmdBuffer);	      	
-
-		if(halBLEIsConnected() == 0) {
-			ESP_LOGI(CONSOLE_UART_TAG,"Not connected, ignoring '%c'", character);
-		} else {
-			//Do not send anything if queues are uninitialized
-			if(hid_ble == NULL)
-			{
-				ESP_LOGE(CONSOLE_UART_TAG,"queues not initialized");
-				continue;
-			}
-			switch (character){
-				case 'a':
-					mouseCmd.cmd[0] = 0x10;
-					mouseCmd.cmd[1] = -MOUSE_SPEED;
-					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-					ESP_LOGI(CONSOLE_UART_TAG,"mouse: a");
-					break;
-				case 's':
-					mouseCmd.cmd[0] = 0x11;
-					mouseCmd.cmd[1] = MOUSE_SPEED;
-					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-					ESP_LOGI(CONSOLE_UART_TAG,"mouse: s");
-					break;
-				case 'd':
-					mouseCmd.cmd[0] = 0x10;
-					mouseCmd.cmd[1] = MOUSE_SPEED;
-					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-					ESP_LOGI(CONSOLE_UART_TAG,"mouse: d");
-					break;
-				case 'w':
-					mouseCmd.cmd[0] = 0x11;
-					mouseCmd.cmd[1] = -MOUSE_SPEED;
-					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-					ESP_LOGI(CONSOLE_UART_TAG,"mouse: w");
-					break;
-				case 'l':
-					mouseCmd.cmd[0] = 0x13;
-					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-					ESP_LOGI(CONSOLE_UART_TAG,"mouse: l");
-					break;
-				case 'r':
-					mouseCmd.cmd[0] = 0x14;
-					xQueueSend(hid_ble,(void *)&mouseCmd, (TickType_t) 0);
-					ESP_LOGI(CONSOLE_UART_TAG,"mouse: r");
-					break;
-				case 'q':
-					ESP_LOGI(CONSOLE_UART_TAG,"received q: sending key y for test purposes");
-					keyboardCmd.cmd[0] = 0x20;
-					keyboardCmd.cmd[1] = 28;
-					xQueueSend(hid_ble,(void *)&keyboardCmd, (TickType_t) 0);
-					break;
-				default:
-					ESP_LOGI(CONSOLE_UART_TAG,"received: %d",character);
-					break;
-			}
-		}
-    }
 }
 
 
-void uart_external(void *pvParameters)
+void uart_external_task(void *pvParameters)
 {
     char character;
     struct cmdBuf cmdBuffer;
@@ -631,7 +477,7 @@ void uart_external(void *pvParameters)
     
     while(1)
     {
-        // read single byte
+        // read & process a single byte
         uart_read_bytes(EX_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
         uart_parse_command(character, &cmdBuffer);	      	
     }
@@ -646,10 +492,8 @@ void blink_task(void *pvParameter)
     
     while(1) {
 		
-		if (halBLEIsConnected()) 
-			blinkTime=1000;
+		if (sec_conn) blinkTime=1000;
 		else blinkTime=250;
-		
 		
         /* Blink off (output low) */
         gpio_set_level(INDICATOR_LED_PIN, 0);
@@ -660,20 +504,110 @@ void blink_task(void *pvParameter)
     }
 }
 
-void app_main()
+void uart_console_task(void *pvParameters)
+{
+    char character;
+    uint8_t kbdcmd[] = {28};
+    
+    //Install UART driver, and get the queue.
+    uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
+
+    ESP_LOGI("UART","console UART processing task started");
+    
+    while(1)
+    {
+        // read single byte
+        uart_read_bytes(CONSOLE_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
+		// uart_parse_command(character, &cmdBuffer);	      	
+
+		if(sec_conn == false) {
+			ESP_LOGI(CONSOLE_UART_TAG,"Not connected, ignoring '%c'", character);
+		} else {
+			switch (character){
+				case 'a':
+					esp_hidd_send_mouse_value(hid_conn_id,0,-MOUSE_SPEED,0,0);
+					ESP_LOGI(CONSOLE_UART_TAG,"mouse: a");
+					break;
+				case 's':
+					esp_hidd_send_mouse_value(hid_conn_id,0,0,MOUSE_SPEED,0);
+					ESP_LOGI(CONSOLE_UART_TAG,"mouse: s");
+					break;
+				case 'd':
+					esp_hidd_send_mouse_value(hid_conn_id,0,MOUSE_SPEED,0,0);
+					ESP_LOGI(CONSOLE_UART_TAG,"mouse: d");
+					break;
+				case 'w':
+					esp_hidd_send_mouse_value(hid_conn_id,0,0,-MOUSE_SPEED,0);
+					ESP_LOGI(CONSOLE_UART_TAG,"mouse: w");
+					break;
+				case 'l':
+					esp_hidd_send_mouse_value(hid_conn_id,(1<<0),0,0,0);
+					esp_hidd_send_mouse_value(hid_conn_id,0,0,0,0);
+					break;
+				case 'r':
+					esp_hidd_send_mouse_value(hid_conn_id,(1<<1),0,0,0);
+					esp_hidd_send_mouse_value(hid_conn_id,0,0,0,0);
+					ESP_LOGI(CONSOLE_UART_TAG,"mouse: r");
+					break;
+				case 'q':
+					kbdcmd[0] = 28;
+					esp_hidd_send_keyboard_value(hid_conn_id,0,kbdcmd,1);
+					kbdcmd[0] = 0;
+					esp_hidd_send_keyboard_value(hid_conn_id,0,kbdcmd,1);
+					ESP_LOGI(CONSOLE_UART_TAG,"received q: sending key y (z for QWERTZ) for test purposes");
+					break;
+				default:
+					ESP_LOGI(CONSOLE_UART_TAG,"received: %d, no HID action",character);
+					break;
+			}
+		}
+    }
+}
+
+
+void app_main(void)
 {
     esp_err_t ret;
-    
-    esp_log_level_set("*", ESP_LOG_VERBOSE);
 
     // Initialize NVS.
     ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK( ret );
 
+    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    ret = esp_bt_controller_init(&bt_cfg);
+    if (ret) {
+        ESP_LOGE(HID_DEMO_TAG, "%s initialize controller failed\n", __func__);
+        return;
+    }
+
+    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
+    if (ret) {
+        ESP_LOGE(HID_DEMO_TAG, "%s enable controller failed\n", __func__);
+        return;
+    }
+
+    ret = esp_bluedroid_init();
+    if (ret) {
+        ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
+        return;
+    }
+
+    ret = esp_bluedroid_enable();
+    if (ret) {
+        ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
+        return;
+    }
+
+    if((ret = esp_hidd_profile_init()) != ESP_OK) {
+        ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
+    }
+    
     // Read config
     nvs_handle my_handle;
 	ESP_LOGI("MAIN","loading configuration from NVS");
@@ -684,36 +618,44 @@ void app_main()
     nvs_get_str (my_handle, "btname", config.bt_device_name, &available_size);
     if(ret != ESP_OK) 
     {
-        ESP_LOGE("MAIN","error reading NVS - bt name, setting to default");
+        ESP_LOGI("MAIN","error reading NVS - bt name, setting to default");
         strcpy(config.bt_device_name, GATTS_TAG);
     } else ESP_LOGI("MAIN","bt device name is: %s",config.bt_device_name);
 
     ret = nvs_get_u8(my_handle, "locale", &config.locale);
-    if(ret != ESP_OK || config.locale >= LAYOUT_MAX) 
+    //if(ret != ESP_OK || config.locale >= LAYOUT_MAX) 
+    ///@todo implement keyboard layouts.
+    if(ret != ESP_OK) 
     {
-        ESP_LOGE("MAIN","error reading NVS - locale, setting to US_INTERNATIONAL");
-        config.locale = LAYOUT_US_INTERNATIONAL;
+        ESP_LOGI("MAIN","error reading NVS - locale, setting to US_INTERNATIONAL");
+        //config.locale = LAYOUT_US_INTERNATIONAL;
     } else ESP_LOGI("MAIN","locale code is : %d",config.locale);
     nvs_close(my_handle);
+    ///@todo How to handle the locale here? We have the memory for full lookups on the ESP32, but how to communicate this with the Teensy?
 
-    // TBD: apply country code
-    // load HID country code for locale before initialising HID
-    // hidd_set_countrycode(get_hid_country_code(config.locale));
+    ///register the callback function to the gap module
+    esp_ble_gap_register_callback(gap_event_handler);
+    esp_hidd_register_callbacks(hidd_event_callback);
 
+    /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
+    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_BOND;     //bonding with peer device after authentication
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
+    uint8_t key_size = 16;      //the key size should be 7~16 bytes
+    uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+    uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+    esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(uint8_t));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap, sizeof(uint8_t));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
+    /* If your BLE device act as a Slave, the init_key means you hope which types of key of the master should distribute to you,
+    and the response key means which key you can distribute to the Master;
+    If your BLE device act as a master, the response key means you hope which types of key of the slave should distribute to you, 
+    and the init key means which key you can distribute to the slave. */
+    esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
 
-    //activate mouse & keyboard BT stack (joystick is not working yet)
-    halBLEInit(1,1,0,config.bt_device_name);
-    ESP_LOGI("HIDD","MAIN finished...");
-    hid_ble = xQueueCreate(32,sizeof(hid_cmd_t));
-    
-    esp_log_level_set("*", ESP_LOG_DEBUG); 
-
-  
-    // now start the tasks for processing UART input and indicator LED  
- 
-    xTaskCreate(&uart_console,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
-    xTaskCreate(&uart_external, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
+    xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
+    xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
+    ///@todo maybe reduce stack size for blink task? 4k words for blinky :-)?
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
-    
 }
 

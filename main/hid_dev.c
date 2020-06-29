@@ -50,9 +50,7 @@ void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id,
     // get att handle for report
     if ((p_rpt = hid_dev_rpt_by_id(id, type)) != NULL) {
         // if notifications are enabled
-        #if LOG_LEVEL_BLE > ESP_LOG_DEBUG
         ESP_LOGD(HID_LE_PRF_TAG, "%s(), send the report, handle = %d", __func__, p_rpt->handle);
-        #endif
         esp_ble_gatts_send_indicate(gatts_if, conn_id, p_rpt->handle, length, data, false);
     }
     

@@ -28,6 +28,9 @@
 // HID mouse input report length
 #define HID_MOUSE_IN_RPT_LEN        5
 
+// HID joystick input report length
+#define HID_JOYSTICK_IN_RPT_LEN        12
+
 // HID consumer control input report length
 #define HID_CC_IN_RPT_LEN           2
 
@@ -147,5 +150,18 @@ void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mi
     return;
 }
 
+#if CONFIG_MODULE_USEJOYSTICK
 
+	void esp_hidd_send_joystick_value(uint16_t conn_id, uint8_t *joystick_report, uint8_t length)
+	{
+		uint8_t buffer[HID_JOYSTICK_IN_RPT_LEN];
+		
+		memcpy(buffer,joystick_report,length);
+		
+		hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
+							HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT, HID_JOYSTICK_IN_RPT_LEN, buffer);
+		return;
+	}
+
+#endif /* CONFIG_MODULE_USEJOYSTICK */
 

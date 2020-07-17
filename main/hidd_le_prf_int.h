@@ -45,13 +45,13 @@
 
 // HID Report IDs for the service
 #define HID_RPT_ID_KEY_IN        1   // Keyboard input report ID
-#define HID_RPT_ID_CC_IN         2   //Consumer Control input report ID
+#define HID_RPT_ID_CC_IN         2   // Consumer Control input report ID
 #define HID_RPT_ID_MOUSE_IN      3   // Mouse input report ID
-#define HID_RPT_ID_VENDOR_OUT    4   // Vendor output report ID
-#define HID_RPT_ID_LED_OUT       0  // LED output report ID
-#define HID_RPT_ID_FEATURE       0  // Feature report ID
+#define HID_RPT_ID_JOY_IN        4   // Joystick input report ID
+#define HID_RPT_ID_LED_OUT       0   // LED output report ID
+#define HID_RPT_ID_FEATURE       0   // Feature report ID
 
-#define HIDD_APP_ID			0x1812//ATT_SVC_HID
+#define HIDD_APP_ID			0x1812   //ATT_SVC_HID
 
 #define BATTRAY_APP_ID       0x180f
 
@@ -138,12 +138,6 @@ enum {
     HIDD_LE_IDX_REPORT_LED_OUT_VAL,
     HIDD_LE_IDX_REPORT_LED_OUT_REP_REF,
 
-#if (SUPPORT_REPORT_VENDOR  == true)
-    /// Report Vendor
-    HIDD_LE_IDX_REPORT_VENDOR_OUT_CHAR,
-    HIDD_LE_IDX_REPORT_VENDOR_OUT_VAL,
-    HIDD_LE_IDX_REPORT_VENDOR_OUT_REP_REF,
-#endif
     HIDD_LE_IDX_REPORT_CC_IN_CHAR,
     HIDD_LE_IDX_REPORT_CC_IN_VAL,
     HIDD_LE_IDX_REPORT_CC_IN_CCC,
@@ -154,6 +148,16 @@ enum {
     HIDD_LE_IDX_REPORT_MOUSE_IN_VAL,
     HIDD_LE_IDX_REPORT_MOUSE_IN_CCC,
     HIDD_LE_IDX_REPORT_MOUSE_REP_REF,
+    
+    #if CONFIG_MODULE_USEJOYSTICK
+		//Report Joystick input
+
+		HIDD_LE_IDX_REPORT_JOY_IN_CHAR,
+		HIDD_LE_IDX_REPORT_JOY_IN_VAL,
+		HIDD_LE_IDX_REPORT_JOY_IN_CCC,
+		HIDD_LE_IDX_REPORT_JOY_IN_REP_REF,
+
+	#endif /* CONFIG_MODULE_USEJOYSTICK */
     
     // Boot Keyboard Input Report
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_CHAR,

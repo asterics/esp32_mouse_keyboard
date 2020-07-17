@@ -78,6 +78,7 @@ _Note:_ We do not test these on a regular basis!
 |$GP|Get BLE pairings|--|Prints out all paired devices' MAC adress. The order is used for DP as well, starting with 0|
 |$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
 |$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
+|$RL|Set BLE rate limiter|0-100000|Set the minimum time between two BLE GATT indicates (HID reports), if enabled in menuconfig|
 |$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
 
 ### HID input

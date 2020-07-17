@@ -536,14 +536,14 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 							//check interval, jst to be sure use the absolute value of the subtraction.
 							if(abs(esp_timer_get_time() - cmdBuffer->lastTimeHIDCommandSent) > timeIntervalHIDCommand)
 							{
-								//esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
+								esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
 								
 								cmdBuffer->lastTimeHIDCommandSent = esp_timer_get_time();
 							} else {
 								ESP_LOGI(EXT_UART_TAG,"Rate limit: discard joystick report");
 							}
 						#else /* CONFIG_MODULE_USERATELIMITER */
-							//esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
+							esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
 						#endif /* CONFIG_MODULE_USERATELIMITER */
 					#else
 						ESP_LOGE(EXT_UART_TAG,"Got joystick report, although joystick is not built-in!");

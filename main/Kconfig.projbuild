@@ -44,7 +44,7 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 			
 	config MODULE_USEJOYSTICK
 		depends on MODULE_USEMOUSE
-		bool "Enable BLE-HID joystick (UNUSED)"
+		bool "Enable BLE-HID joystick"
 		default n
 		help
 			Enable the Joystick interface for Bluetooth.

@@ -56,7 +56,32 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 			If enabled, the module denies pairing requests by default.
 			It is possible to enable the pairing by sending the pairing en-/disable command
 			via the serial interface.
-		
+
+	config MODULE_USERATELIMITER
+		bool "Enable BLE transmission rate limiter"
+		default y
+		help
+			Enables a rate limiter, to avoid any delayed HID commands
+			on the BLE central device. If enabled, it is possible to
+			define the minimal time between a HID command via the
+			UART command "$RL<us>" (e.g. "$RL10000" for 10ms).
+			The configuration setting "Rate limiter default" sets the
+			default value on boot.
+			Note: Only mouse & joystick reports are handled by the rate limiter!
+			
+	config MODULE_RATELIMITERACCUMULATE
+		bool "Accumulate mouse HID packets if rate limiter hits"
+		depends on MODULE_USERATELIMITER
+		default n
+		help
+			If enabled, relative mouse movements are accumulated and
+			sent on next occasion. If disabled, the HID report is discarded.
+
+	config MODULE_RATELIMITERDEFAULT
+		int "Ratelimiter time between HID commands [us]"
+		depends on MODULE_USERATELIMITER
+		default 0
+        range 0 100000
 
 	config USE_AS_FLIPMOUSE_FABI
 		bool "Use project as FLipMouse/FABI Bluetooth module"

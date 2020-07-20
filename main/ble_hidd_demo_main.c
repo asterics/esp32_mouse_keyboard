@@ -630,6 +630,21 @@ void uart_console_task(void *pvParameters)
             ESP_LOGI(CONSOLE_UART_TAG,"Not connected, ignoring '%c'", character);
         } else {
             switch (character) {
+			case 'm':
+				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_MUTE,true);
+				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_MUTE,false);
+				ESP_LOGI(CONSOLE_UART_TAG,"consumer: mute");
+				break;
+			case 'p':
+				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_UP,true);
+				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_UP,false);
+				ESP_LOGI(CONSOLE_UART_TAG,"consumer: volume plus");
+				break;
+			case 'o':
+				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_DOWN,true);
+				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_DOWN,false);
+				ESP_LOGI(CONSOLE_UART_TAG,"consumer: volume minus");
+				break;
             case 'a':
                 esp_hidd_send_mouse_value(hid_conn_id,0,-MOUSE_SPEED,0,0);
                 ESP_LOGI(CONSOLE_UART_TAG,"mouse: a");

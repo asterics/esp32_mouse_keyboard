@@ -118,17 +118,8 @@ struct cmdBuf {
     int state;
     int expectedBytes;
     int bufferLength;
-    #if CONFIG_MODULE_USERATELIMITER
-		int64_t lastTimeHIDCommandSent;
-		int16_t accumValues[3];
-		uint8_t buttonstate;
-    #endif
     uint8_t buf[MAX_CMDLEN];
 };
-
-#if CONFIG_MODULE_USERATELIMITER
-	int64_t timeIntervalHIDCommand = CONFIG_MODULE_RATELIMITERDEFAULT;
-#endif
 
 static uint8_t manufacturer[19]= {'A', 's', 'T', 'e', 'R', 'I', 'C', 'S', ' ', 'F', 'o', 'u', 'n', 'd', 'a', 't', 'i', 'o', 'n'};
 
@@ -489,8 +480,10 @@ void processCommand(struct cmdBuf *cmdBuffer)
             ESP_LOGE(EXT_UART_TAG,"RL: invalid parameter, need integer <0-100000>");
             return;
         }
-        ESP_LOGI(EXT_UART_TAG,"RL: rate limit interval set from %lld to %d", timeIntervalHIDCommand, newinterval);
-        timeIntervalHIDCommand = newinterval;
+        ///TODO: call setter/getter for rate limiter
+        ESP_LOGE(EXT_UART_TAG,"RL: TBD!");
+        //ESP_LOGI(EXT_UART_TAG,"RL: rate limit interval set from %lld to %d", timeIntervalHIDCommand, newinterval);
+        //timeIntervalHIDCommand = newinterval;
         return;
 	}
     #endif
@@ -534,22 +527,8 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                 /////// Joystick
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
 					#if CONFIG_MODULE_USEJOYSTICK
-						///If we are using the rate limiter, check for the last transmission of a HID command.
-						///Note: as we sent absolute data for joystick axis, I think it is no problem to
-						/// discard any packets. If we get them too fast, many of them are still sent with the current values.
-						#if CONFIG_MODULE_USERATELIMITER
-							//check interval, jst to be sure use the absolute value of the subtraction.
-							if(abs(esp_timer_get_time() - cmdBuffer->lastTimeHIDCommandSent) > timeIntervalHIDCommand)
-							{
-								//esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
-								
-								cmdBuffer->lastTimeHIDCommandSent = esp_timer_get_time();
-							} else {
-								ESP_LOGI(EXT_UART_TAG,"Rate limit: discard joystick report");
-							}
-						#else /* CONFIG_MODULE_USERATELIMITER */
-							//esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
-						#endif /* CONFIG_MODULE_USERATELIMITER */
+						///@todo enable if joystick is implemented.
+						//esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
 					#else
 						ESP_LOGE(EXT_UART_TAG,"Got joystick report, although joystick is not built-in!");
 					#endif /* CONFIG_MODULE_USEJOYSTICK */
@@ -557,72 +536,7 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                     
                 /////// Mouse
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
-					///If we are using the rate limiter, check for the last transmission of a HID command.
-					/// Note: For mouse reports, updated values are either accumulated or discarded.
-					///  Especially with the FLipMouse, many small reports with small movements are sent.
-					///  So either we discard them (easy way) or accumulate the axis' values & sent the final value next possible occasion.
-					#if CONFIG_MODULE_USERATELIMITER
-						//check interval, just to be sure use the absolute value of the subtraction.
-						if(abs(esp_timer_get_time() - cmdBuffer->lastTimeHIDCommandSent) > timeIntervalHIDCommand)
-						{
-							#if CONFIG_MODULE_RATELIMITERACCUMULATE
-								//get for all 3 relative axis the current value, limit if necessary
-								//subtract from accumulated value the amount which is sent now.
-								int8_t current[3];
-								for(uint8_t i = 0; i<3; i++)
-								{
-									//add current values
-									cmdBuffer->accumValues[i] += cmdBuffer->buf[i+3];
-									//limit accumulated value, if we hit the upper limit, there 
-									// is something going wrong...
-									if(cmdBuffer->accumValues[i] > 6000) cmdBuffer->accumValues[i] = 6000;
-									if(cmdBuffer->accumValues[i] < -6000) cmdBuffer->accumValues[i] = -6000;
-									
-									//limit values on upper&lower boundaries
-									if(cmdBuffer->accumValues[i] > 127) {
-										current[i] = 127; cmdBuffer->accumValues[i] -= 127;
-									} else if(cmdBuffer->accumValues[i] < -127) {
-										current[i] = -127; cmdBuffer->accumValues[i] += 127;
-									} else {
-										current[i] = cmdBuffer->accumValues[i];
-										cmdBuffer->accumValues[i] = 0;
-									}
-								}
-								esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],current[0],current[1],current[2]);
-							#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
-								esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-							#endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
-							cmdBuffer->lastTimeHIDCommandSent = esp_timer_get_time();
-							cmdBuffer->buttonstate = cmdBuffer->buf[2];
-						} else {
-							//if the button state of the mouse changes, we
-							//will send the report, even if the interval has not passed yet.
-							//this case is not happening often, but it should be considered to avoid
-							//sticky mouse buttons.
-							//Note that the transmission will not modify the accumulate buffer.
-							if(cmdBuffer->buf[2] != cmdBuffer->buttonstate)
-							{
-								ESP_LOGI(EXT_UART_TAG,"Button changed, sending out of interval");
-								esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-							} else {
-								#if CONFIG_MODULE_RATELIMITERACCUMULATE
-									for(uint8_t i = 0; i<3; i++)
-									{
-										//add current values
-										cmdBuffer->accumValues[i] += cmdBuffer->buf[i+3];
-										//limit accumulated value, if we hit the upper limit, there 
-										// is something going wrong...
-										if(cmdBuffer->accumValues[i] > 6000) cmdBuffer->accumValues[i] = 6000;
-										if(cmdBuffer->accumValues[i] < -6000) cmdBuffer->accumValues[i] = -6000;
-									}
-								#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
-									ESP_LOGV(EXT_UART_TAG,"Rate limit: discard mouse report");
-								#endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
-							}
-						}
-					#else  /* CONFIG_MODULE_USERATELIMITER */
-						esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-					#endif  /* CONFIG_MODULE_USERATELIMITER */
+					esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
                 }
                 else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
             }
@@ -653,11 +567,6 @@ void uart_external_task(void *pvParameters)
 {
     char character;
     struct cmdBuf cmdBuffer;
-    #if CONFIG_MODULE_USERATELIMITER
-		cmdBuffer.lastTimeHIDCommandSent = esp_timer_get_time();
-		cmdBuffer.accumValues[0] = cmdBuffer.accumValues[1] = cmdBuffer.accumValues[2] = 0;
-    #endif
-
 
     //Install UART driver, and get the queue.
     esp_err_t ret = ESP_OK;
@@ -724,10 +633,6 @@ void uart_console_task(void *pvParameters)
     uint8_t hid_or_command = 0;
     struct cmdBuf commands;
     commands.state=CMDSTATE_IDLE;
-    #if CONFIG_MODULE_USERATELIMITER
-		commands.lastTimeHIDCommandSent = esp_timer_get_time();
-		commands.accumValues[0] = commands.accumValues[1] = commands.accumValues[2] = 0;
-    #endif
 
     //Install UART driver, and get the queue.
     uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);

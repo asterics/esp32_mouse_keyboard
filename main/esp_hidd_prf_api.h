@@ -162,6 +162,20 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
 
 void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y, int8_t wheel);
 
+#if CONFIG_MODULE_USERATELIMITER
+/**
+ * @brief Set the new interval for the ratelimiter (in us)
+ * @param newinterval New interval [us]
+ */
+void esp_hidd_set_interval(uint32_t newinterval);
+
+/**
+ * @brief Get the current interval for the ratelimiter (in us)
+ * @return Current interval [us]
+ */
+uint32_t esp_hidd_get_interval(void);
+#endif /* CONFIG_MODULE_USERATELIMITER */
+
 #ifdef __cplusplus
 }
 #endif

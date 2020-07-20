@@ -48,7 +48,7 @@
 #define HID_RPT_ID_CC_IN         2   //Consumer Control input report ID
 #define HID_RPT_ID_MOUSE_IN      3   // Mouse input report ID
 #define HID_RPT_ID_VENDOR_OUT    4   // Vendor output report ID
-#define HID_RPT_ID_LED_OUT       0  // LED output report ID
+#define HID_RPT_ID_LED_OUT       1  // LED output report ID
 #define HID_RPT_ID_FEATURE       0  // Feature report ID
 
 #define HIDD_APP_ID			0x1812//ATT_SVC_HID

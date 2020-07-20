@@ -121,6 +121,7 @@ struct cmdBuf {
     #if CONFIG_MODULE_USERATELIMITER
 		int64_t lastTimeHIDCommandSent;
 		int16_t accumValues[3];
+		uint8_t buttonstate;
     #endif
     uint8_t buf[MAX_CMDLEN];
 };
@@ -487,6 +488,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
         }
         ESP_LOGI(EXT_UART_TAG,"RL: rate limit interval set from %lld to %d", timeIntervalHIDCommand, newinterval);
         timeIntervalHIDCommand = newinterval;
+        return;
 	}
     #endif
 
@@ -582,26 +584,38 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 										current[i] = cmdBuffer->accumValues[i];
 										cmdBuffer->accumValues[i] = 0;
 									}
-									esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],current[0],current[1],current[2]);
 								}
+								esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],current[0],current[1],current[2]);
 							#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
 								esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
 							#endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
 							cmdBuffer->lastTimeHIDCommandSent = esp_timer_get_time();
+							cmdBuffer->buttonstate = cmdBuffer->buf[2];
 						} else {
-							#if CONFIG_MODULE_RATELIMITERACCUMULATE
-								for(uint8_t i = 0; i<3; i++)
-								{
-									//add current values
-									cmdBuffer->accumValues[i] += cmdBuffer->buf[i+3];
-									//limit accumulated value, if we hit the upper limit, there 
-									// is something going wrong...
-									if(cmdBuffer->accumValues[i] > 6000) cmdBuffer->accumValues[i] = 6000;
-									if(cmdBuffer->accumValues[i] < -6000) cmdBuffer->accumValues[i] = -6000;
-								}
-							#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
-								ESP_LOGV(EXT_UART_TAG,"Rate limit: discard mouse report");
-							#endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
+							//if the button state of the mouse changes, we
+							//will send the report, even if the interval has not passed yet.
+							//this case is not happening often, but it should be considered to avoid
+							//sticky mouse buttons.
+							//Note that the transmission will not modify the accumulate buffer.
+							if(cmdBuffer->buf[2] != cmdBuffer->buttonstate)
+							{
+								ESP_LOGI(EXT_UART_TAG,"Button changed, sending out of interval");
+								esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+							} else {
+								#if CONFIG_MODULE_RATELIMITERACCUMULATE
+									for(uint8_t i = 0; i<3; i++)
+									{
+										//add current values
+										cmdBuffer->accumValues[i] += cmdBuffer->buf[i+3];
+										//limit accumulated value, if we hit the upper limit, there 
+										// is something going wrong...
+										if(cmdBuffer->accumValues[i] > 6000) cmdBuffer->accumValues[i] = 6000;
+										if(cmdBuffer->accumValues[i] < -6000) cmdBuffer->accumValues[i] = -6000;
+									}
+								#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
+									ESP_LOGV(EXT_UART_TAG,"Rate limit: discard mouse report");
+								#endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
+							}
 						}
 					#else  /* CONFIG_MODULE_USERATELIMITER */
 						esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);

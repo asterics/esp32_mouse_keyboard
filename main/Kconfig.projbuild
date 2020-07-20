@@ -70,7 +70,7 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 			Note: Only mouse & joystick reports are handled by the rate limiter!
 			
 	config MODULE_RATELIMITERACCUMULATE
-		bool "Accumulate mouse HID packets if rate limiter hits"
+		bool "Accumulate mouse HID packets if rate limiter hits (NOT RECOMMENDED)"
 		depends on MODULE_USERATELIMITER
 		default n
 		help
@@ -80,7 +80,7 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 	config MODULE_RATELIMITERDEFAULT
 		int "Ratelimiter time between HID commands [us]"
 		depends on MODULE_USERATELIMITER
-		default 0
+		default 100
         range 0 100000
 
 	config USE_AS_FLIPMOUSE_FABI

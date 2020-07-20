@@ -600,7 +600,7 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 									if(cmdBuffer->accumValues[i] < -6000) cmdBuffer->accumValues[i] = -6000;
 								}
 							#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
-								ESP_LOGI(EXT_UART_TAG,"Rate limit: discard mouse report");
+								ESP_LOGV(EXT_UART_TAG,"Rate limit: discard mouse report");
 							#endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
 						}
 					#else  /* CONFIG_MODULE_USERATELIMITER */

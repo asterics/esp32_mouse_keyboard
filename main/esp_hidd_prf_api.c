@@ -24,6 +24,8 @@
 #include <string.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 // HID keyboard input report length
 #define HID_KEYBOARD_IN_RPT_LEN     8
@@ -60,6 +62,10 @@
 	 * @note This handle is used in accumulate mode only -> enable accumulate in KConfig.
 	 */
 	esp_timer_handle_t intervalTimer;
+	/** @brief Currently used connection ID, used for the rate limiter callback */
+	uint16_t currentconnid;
+	/** @brief Semaphore for synchronizing data between esp_hidd_send_mouse_value and rate_limier_callback */
+	SemaphoreHandle_t rate_limiter_sem = NULL;
 #endif /* CONFIG_MODULE_USERATELIMITER */
 
 
@@ -74,8 +80,37 @@
  */
 static void rate_limiter_callback(void* arg)
 {
-	
-	///@todo !!!!
+	if(xSemaphoreTake(rate_limiter_sem,(TickType_t)0) == pdTRUE )
+	{
+		//trigger actions only if one of the values are != 0 or the button state changed.
+		if((accumValues[0] != 0) || (accumValues[1] != 0) || (accumValues[2] != 0) || (buttonstate != newbuttonstate))
+		{
+			int8_t buffer[HID_MOUSE_IN_RPT_LEN];
+			
+			buffer[0] = newbuttonstate;   // Buttons
+			buffer[4] = 0;              // AC Pan (unused)
+			
+			for(uint8_t i = 0; i<3; i++)
+			{
+				if(accumValues[i] > 127)
+				{
+					buffer[i+1] = 127;
+					accumValues[i] -= 127;
+				} else if(accumValues[i] < -127) {
+					buffer[i+1] = -127;
+					accumValues[i] += 127;
+				} else {
+					buffer[i+1] = accumValues[i];
+					accumValues[i] = 0;
+				}
+			}
+			ESP_LOGI(HID_LE_PRF_TAG,"mouse: %d,%d,%d,%d",buffer[0],buffer[1],buffer[2],buffer[3]);
+			hid_dev_send_report(hidd_le_env.gatt_if, currentconnid,
+				HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, (uint8_t *)buffer);
+			buttonstate = newbuttonstate;
+		}
+		xSemaphoreGive(rate_limiter_sem);
+	}
 }
 #endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
 
@@ -140,7 +175,12 @@ esp_err_t esp_hidd_profile_init(void)
 				ESP_LOGE(HID_LE_PRF_TAG,"error starting rate limit timer");
 				return ESP_FAIL;
 			}
-			
+			rate_limiter_sem = xSemaphoreCreateBinary();
+			if(rate_limiter_sem == NULL) {
+				ESP_LOGE(HID_LE_PRF_TAG,"error creating semaphore!");
+				return ESP_FAIL;
+			}
+			xSemaphoreGive(rate_limiter_sem);
 	    #else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
 			lastTimeHIDCommandSent = esp_timer_get_time();
 	    #endif /* CONFIG_MODULE_RATELIMITERACCUMULATE */
@@ -155,9 +195,9 @@ esp_err_t esp_hidd_profile_init(void)
  */
 void esp_hidd_set_interval(uint32_t newinterval)
 {
-	if(newinterval > 100000)
+	if((newinterval > 100000) || (newinterval < 100))
 	{
-		ESP_LOGE(HID_LE_PRF_TAG,"Rate limiter interval too high!");
+		ESP_LOGE(HID_LE_PRF_TAG,"Rate limiter out of range!");
 		return;
 	}
 	timeIntervalHIDCommand = newinterval;
@@ -254,14 +294,22 @@ void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mi
 		// interval timer
 		// OR we discard them.
 		#if CONFIG_MODULE_RATELIMITERACCUMULATE
-			//limit accumulated values to max. ~4 reports
-			for(uint8_t i = 0; i<3; i++)
+			if(xSemaphoreTake(rate_limiter_sem,(TickType_t)5) == pdTRUE )
 			{
-				accumValues[i] += buffer[i+1];
-				if(accumValues[i] > 512) accumValues[i] = 512;
-				if(accumValues[i] < -512) accumValues[i] = -512;
-			}
-			newbuttonstate = mouse_button;
+				//use parameter values, if buffer array is used we loose sign.
+				accumValues[0] += mickeys_x;
+				accumValues[1] += mickeys_y;
+				accumValues[2] += wheel;
+				//limit accumulated values to max. ~4 reports
+				for(uint8_t i = 0; i<3; i++)
+				{
+					if(accumValues[i] > 512) accumValues[i] = 512;
+					if(accumValues[i] < -512) accumValues[i] = -512;
+				}
+				newbuttonstate = mouse_button;
+				currentconnid = conn_id;
+				xSemaphoreGive(rate_limiter_sem);
+			} else ESP_LOGW(HID_LE_PRF_TAG,"Error obtaining semaphore");
 		#else /* CONFIG_MODULE_RATELIMITERACCUMULATE */
 			//check interval, just to be sure use the absolute value of the subtraction.
 			//if the mouse button changes, send too.

@@ -80,8 +80,8 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 	config MODULE_RATELIMITERDEFAULT
 		int "Ratelimiter time between HID commands [us]"
 		depends on MODULE_USERATELIMITER
-		default 100
-        range 0 100000
+		default 500
+        range 100 100000
 
 	config USE_AS_FLIPMOUSE_FABI
 		bool "Use project as FLipMouse/FABI Bluetooth module"

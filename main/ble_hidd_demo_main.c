@@ -476,14 +476,12 @@ void processCommand(struct cmdBuf *cmdBuffer)
             ESP_LOGE(EXT_UART_TAG,"RL: cannot parse, need integer <0-100000>");
             return;
         }
-        if(newinterval < 0 || newinterval > 100000) {
-            ESP_LOGE(EXT_UART_TAG,"RL: invalid parameter, need integer <0-100000>");
+        if(newinterval < 100 || newinterval > 100000) {
+            ESP_LOGE(EXT_UART_TAG,"RL: invalid parameter, need integer <100-100000>");
             return;
         }
-        ///TODO: call setter/getter for rate limiter
-        ESP_LOGE(EXT_UART_TAG,"RL: TBD!");
-        //ESP_LOGI(EXT_UART_TAG,"RL: rate limit interval set from %lld to %d", timeIntervalHIDCommand, newinterval);
-        //timeIntervalHIDCommand = newinterval;
+        ESP_LOGI(EXT_UART_TAG,"RL: rate limit interval set from %d to %d", esp_hidd_get_interval(), newinterval);
+        esp_hidd_set_interval(newinterval);
         return;
 	}
     #endif

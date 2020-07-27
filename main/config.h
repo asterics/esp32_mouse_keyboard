@@ -10,7 +10,7 @@
     #if CONFIG_MODULE_FABI
         #define GATTS_TAG "FABI"
     #else
-        #define GATTS_TAG "esp32_mouse_keyboard"
+        #define GATTS_TAG "HID"
     #endif
 #endif
 

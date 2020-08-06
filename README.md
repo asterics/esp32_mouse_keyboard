@@ -12,6 +12,7 @@ Tested devices by the AsTeRICS team:
 |--------------|-------|----------|
 |PC with CSR 4.0 BT dongle, Debian Bullseye | yes | yes |
 |Lenovo T440s, Debian Buster | yes | yes |
+|MacBook Pro (Mid 2012) - macOS Mojave 10.14 | yes | yes |
 |PC with CSR 4.0 BT dongle, Win10 Build 2004 | yes | yes |
 |Lenovo T440s, Win10 Build 2004 in VirtualBox | no | no |
 |Xiaomi Mi A1 - LineageOS 16.0 (Android 9) | yes | yes |

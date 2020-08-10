@@ -119,6 +119,7 @@ Please use the functions provided by `esp_hidd_prf_api.c`.
 
 
 ## Credits and many thanks to:
+- Cong Nguyen (@rampadc) for fixes to support macOS Catalina
 - Paul Stoffregen for the implementation of the keyboard layouts for his Teensyduino project: www.pjrc.com
 - Neil Kolban for his great contributions to the ESP32 SW (in particular the Bluetooth support): https://github.com/nkolban
 - Chegewara for help and support

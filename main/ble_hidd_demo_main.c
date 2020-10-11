@@ -116,9 +116,13 @@ static config_data_t config;
 #define CMDSTATE_GET_ASCII 2
 
 struct cmdBuf {
+	//current state of the parser, CMD_STATE*
     int state;
+    //if a fixed length command is issued, we store expected length here
     int expectedBytes;
     int bufferLength;
+    //if != 0, the result of a command will be sent to the debug console AND the external UART (-> FLipMouse/FABI GUI on PC)
+    int sendToUART;
     uint8_t buf[MAX_CMDLEN];
 };
 
@@ -333,7 +337,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     const char *input = (const char *) cmdBuffer->buf;
     int len = cmdBuffer->bufferLength;
     uint8_t keycode;
-    const char nl = '\n';
+    const char *nl = "\r\n";
     esp_ble_bond_dev_t * btdevlist;
     int counter;
 
@@ -343,8 +347,12 @@ void processCommand(struct cmdBuf *cmdBuffer)
     //get module ID
     if(strcmp(input,"ID") == 0)
     {
-        uart_write_bytes(EX_UART_NUM, MODULE_ID, sizeof(MODULE_ID));
-        ESP_LOGD(EXT_UART_TAG,"sending module id (ID)");
+		if(cmdBuffer->sendToUART != 0)
+		{
+			uart_write_bytes(EX_UART_NUM, MODULE_ID, sizeof(MODULE_ID));
+			uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+		}
+		ESP_LOGI(EXT_UART_TAG,"ID: %s",MODULE_ID);
         return;
     }
     //disable pairing
@@ -401,17 +409,21 @@ void processCommand(struct cmdBuf *cmdBuffer)
                     for(uint8_t i = 0; i<counter; i++)
                     {
                         //print on monitor & external uart
+                        if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, "PAIRING:",strlen("PAIRING:"));
                         esp_log_buffer_hex(EXT_UART_TAG, btdevlist[i].bd_addr, sizeof(esp_bd_addr_t));
                         for (int t=0; t<sizeof(esp_bd_addr_t); t++) {
                             sprintf(hexnum,"%02X ",btdevlist[i].bd_addr[t]);
-                            uart_write_bytes(EX_UART_NUM, hexnum, 3);
+                            if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
                         }
-                        uart_write_bytes(EX_UART_NUM,&nl,sizeof(nl)); //newline
+                        if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
                     }
                     ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
                 } else ESP_LOGE(EXT_UART_TAG,"error getting device list");
             } else ESP_LOGE(EXT_UART_TAG,"error allocating memory for device list");
-        } else ESP_LOGE(EXT_UART_TAG,"error getting bonded devices count or no devices bonded");
+        } else {
+			ESP_LOGE(EXT_UART_TAG,"error getting bonded devices count or no devices bonded");
+			if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, "END\r\n", 5);
+		}
         return;
     }
 
@@ -421,8 +433,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
     {
         int index_to_remove;
         if (!(get_int(input,2,&index_to_remove))) {
-            ESP_LOGE(EXT_UART_TAG,"DP: invalid parameter, need integer");
-            return;
+            ESP_LOGI(EXT_UART_TAG,"DP: no integer, deleting all bonded devices");
+            index_to_remove = -1;
         }
 
         counter = esp_ble_get_bond_device_num();
@@ -444,11 +456,26 @@ void processCommand(struct cmdBuf *cmdBuffer)
             {
                 if(esp_ble_get_bond_device_list(&counter,btdevlist) == ESP_OK)
                 {
-                    esp_ble_remove_bond_device(btdevlist[index_to_remove].bd_addr);
-                    esp_ble_gap_update_whitelist(false,btdevlist[index_to_remove].bd_addr,BLE_WL_ADDR_TYPE_PUBLIC);
-                    esp_ble_gap_update_whitelist(false,btdevlist[index_to_remove].bd_addr,BLE_WL_ADDR_TYPE_RANDOM);
+					//deleting only one pairing (-> -1 == delete all)
+					if(index_to_remove >= 0)
+					{
+	                    esp_ble_remove_bond_device(btdevlist[index_to_remove].bd_addr);
+	                    esp_ble_gap_update_whitelist(false,btdevlist[index_to_remove].bd_addr,BLE_WL_ADDR_TYPE_PUBLIC);
+	                    esp_ble_gap_update_whitelist(false,btdevlist[index_to_remove].bd_addr,BLE_WL_ADDR_TYPE_RANDOM);
+					} else {
+						for(int i = 0; i<counter; i++)
+						{
+							esp_ble_remove_bond_device(btdevlist[i].bd_addr);
+		                    esp_ble_gap_update_whitelist(false,btdevlist[i].bd_addr,BLE_WL_ADDR_TYPE_PUBLIC);
+		                    esp_ble_gap_update_whitelist(false,btdevlist[i].bd_addr,BLE_WL_ADDR_TYPE_RANDOM); 
+						}
+					}
                 } else ESP_LOGE(EXT_UART_TAG,"error getting device list");
                 free (btdevlist);
+                //wait 20 ticks for everything to settle (write commits to NVS)
+                vTaskDelay(20);
+                //then restart to avoid re-bonding of the device(s).
+                esp_restart();
             } else ESP_LOGE(EXT_UART_TAG,"error allocating memory for device list");
         } else ESP_LOGE(EXT_UART_TAG,"error getting bonded devices count");
         return;
@@ -567,6 +594,7 @@ void uart_external_task(void *pvParameters)
 
     ESP_LOGI(EXT_UART_TAG,"external UART processing task started");
     cmdBuffer.state=CMDSTATE_IDLE;
+    cmdBuffer.sendToUART = 1;
 
     while(1)
     {
@@ -604,6 +632,7 @@ void uart_console_task(void *pvParameters)
     //use input as HID test OR as input to processCommand (test commands)
     uint8_t hid_or_command = 0;
     struct cmdBuf commands;
+    commands.sendToUART = 0;
     commands.state=CMDSTATE_IDLE;
 
     //Install UART driver, and get the queue.

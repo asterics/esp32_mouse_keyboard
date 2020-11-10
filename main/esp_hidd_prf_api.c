@@ -62,7 +62,7 @@ esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks)
 
 esp_err_t esp_hidd_profile_init(void)
 {
-     if (hidd_le_env.enabled) {
+	if (hidd_le_env.enabled) {
         ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already initialized");
         return ESP_FAIL;
     }
@@ -76,19 +76,24 @@ esp_err_t esp_hidd_profile_deinit(void)
 {
     uint16_t hidd_svc_hdl = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_SVC];
     if (!hidd_le_env.enabled) {
-        ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already initialized");
+        ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already deinitialized");
         return ESP_OK;
     }
 
     if(hidd_svc_hdl != 0) {
-	esp_ble_gatts_stop_service(hidd_svc_hdl);
-	esp_ble_gatts_delete_service(hidd_svc_hdl);
+		esp_ble_gatts_stop_service(hidd_svc_hdl);
+		esp_ble_gatts_delete_service(hidd_svc_hdl);
     } else {
-	return ESP_FAIL;
-   }
+		return ESP_FAIL;
+	}
     
     /* register the HID device profile to the BTA_GATTS module*/
     esp_ble_gatts_app_unregister(hidd_le_env.gatt_if);
+    
+    //set hidd enabled to false
+    //THX @Lars-Thestorf
+    //see issue #44
+    hidd_le_env.enabled = false;
 
     return ESP_OK;
 }

@@ -96,6 +96,9 @@
 #error "Sorry, currently the BT controller of the ESP32 does NOT support whitelisting. Please deactivate the pairing on demand option in make menuconfig!"
 #endif
 
+/* passkey_requester_addr is used for storing master device address for passkey pairing */
+static esp_bd_addr_t passkey_requester_addr;
+
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
@@ -317,6 +320,23 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         }
 #endif
         break;
+    //passkey request by central device -> need to put in a key via "$PK <pin code>"
+    case ESP_GAP_BLE_PASSKEY_REQ_EVT:
+        ESP_LOGI(HID_DEMO_TAG, "Requesting security key...");
+        memcpy(passkey_requester_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
+        ESP_LOGI(HID_DEMO_TAG, "Requester's BD_ADDR: %08x%04x",\
+                 (passkey_requester_addr[0] << 24) + (passkey_requester_addr[1] << 16) + (passkey_requester_addr[2] << 8) + passkey_requester_addr[3],
+                 (passkey_requester_addr[4] << 8) + passkey_requester_addr[5]);
+        break;
+    //numerical compare request. For simplification, we always answer with yes, so no input is needed.
+    case ESP_GAP_BLE_NC_REQ_EVT:
+               ESP_LOGI(HID_DEMO_TAG, "Requesting confirmation, we will send YES...");
+               memcpy(passkey_requester_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
+        esp_ble_confirm_reply(passkey_requester_addr,true);
+        ESP_LOGI(HID_DEMO_TAG, "Requester's BD_ADDR: %08x%04x",\
+                 (passkey_requester_addr[0] << 24) + (passkey_requester_addr[1] << 16) + (passkey_requester_addr[2] << 8) + passkey_requester_addr[3],
+                 (passkey_requester_addr[4] << 8) + passkey_requester_addr[5]);
+        break;
     default:
         break;
     }
@@ -331,6 +351,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $GP
     // $DPx (number of paired device, starting with 0)
     // $NAME set name of bluetooth device
+    // $PK xxxxxx (6-digit passkey)
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -491,6 +512,27 @@ void processCommand(struct cmdBuf *cmdBuffer)
             ESP_LOGI(EXT_UART_TAG,"NAME: new bt device name was stored");
         }
         else ESP_LOGI(EXT_UART_TAG,"NAME: given bt name is too long or too short");
+        return;
+    }
+    
+    // Send passkey to GATT client, e.g.: $PK 123456
+    if(strncmp(input, "PK ", 3) == 0)
+    {
+        ESP_LOGI(EXT_UART_TAG, "Received passkey input");
+        char passkey_str[7]; // 6 digits and a \0 
+
+        if (strlen(input) == 9)
+        {
+            strcpy(passkey_str, input + 3);
+            uint32_t passkey = strtoul(passkey_str, NULL, 10);
+            
+            ESP_LOGI(EXT_UART_TAG, "[2] Requester's BD_ADDR: %08x%04x",\
+                 (passkey_requester_addr[0] << 24) + (passkey_requester_addr[1] << 16) + (passkey_requester_addr[2] << 8) + passkey_requester_addr[3],
+                 (passkey_requester_addr[4] << 8) + passkey_requester_addr[5]);
+
+            ESP_LOGI(EXT_UART_TAG, "Sending: %06d", passkey);
+            esp_ble_passkey_reply(passkey_requester_addr, true, passkey);
+        }
         return;
     }
 
@@ -803,8 +845,10 @@ void app_main(void)
     esp_hidd_register_callbacks(hidd_event_callback);
 
     /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
-    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_BOND;     //bonding with peer device after authentication
-    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
+    //esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_BOND;     //bonding with peer device after authentication
+    //esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM;     //bonding with peer device after authentication //does not reconnect with catalina
+    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;     //bonding with peer device after authentication //works with catalina, but we need numerical input
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_IO;           //set the IO capability to Yes/No -> works for numerical comparison.
     uint8_t key_size = 16;      //the key size should be 7~16 bytes
     uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;

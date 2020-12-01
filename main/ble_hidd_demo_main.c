@@ -96,6 +96,11 @@
 #error "Sorry, currently the BT controller of the ESP32 does NOT support whitelisting. Please deactivate the pairing on demand option in make menuconfig!"
 #endif
 
+/** @brief NVS handle to resolve BT addr to name
+ * 
+ * In NVS, we store the BT addr as key and the name as value. */
+nvs_handle nvs_bt_name_h;
+
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
@@ -114,6 +119,10 @@ static config_data_t config;
 #define CMDSTATE_IDLE 0
 #define CMDSTATE_GET_RAW 1
 #define CMDSTATE_GET_ASCII 2
+
+//a list of active HID connections.
+//index is the hid_conn_id.
+esp_bd_addr_t active_connections[CONFIG_BT_ACL_CONNECTIONS] = {0};
 
 struct cmdBuf {
 	//current state of the parser, CMD_STATE*
@@ -164,6 +173,15 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .service_uuid_len = sizeof(hidd_service_uuid128),
     .p_service_uuid = hidd_service_uuid128,
     .flag = 0x6,
+};
+
+static esp_ble_scan_params_t scan_params = {
+	.scan_type = BLE_SCAN_TYPE_ACTIVE,
+	.own_addr_type = BLE_ADDR_TYPE_PUBLIC,
+	.scan_filter_policy = BLE_SCAN_FILTER_ALLOW_ALL,
+	.scan_interval = 0x00A0, /* 100ms (n*0.625ms)*/
+	.scan_window = 0x0090, /* 90ms */
+	.scan_duplicate = BLE_SCAN_DUPLICATE_DISABLE,
 };
 
 // config scan response data
@@ -253,11 +271,40 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
     case ESP_HIDD_EVENT_BLE_CONNECT: {
         ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
         hid_conn_id = param->connect.conn_id;
-        xEventGroupClearBits(eventgroup_system,SYSTEM_CURRENTLY_ADVERTISING);
+        
+        //save currently connecting device to the list.
+        //this list is used to switch between connected devices when sending HID packets
+        if(hid_conn_id < CONFIG_BT_ACL_CONNECTIONS)
+        {
+			memcpy(active_connections[hid_conn_id], param->connect.remote_bda, sizeof(esp_bd_addr_t));
+		} else {
+			ESP_LOGE(HID_DEMO_TAG,"Oups, hid_conn_id too high!");
+		}
+        
+        //to allow more connections, we simply restart the adv process.
+        esp_ble_gap_start_advertising(&hidd_adv_params);
+        //xEventGroupClearBits(eventgroup_system,SYSTEM_CURRENTLY_ADVERTISING);
         break;
     }
     case ESP_HIDD_EVENT_BLE_DISCONNECT: {
-        sec_conn = false;
+		for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+		{
+			//check if this addr is in the array
+			if(memcmp(active_connections[i],param->disconnect.remote_bda,sizeof(esp_bd_addr_t)) == 0)
+			{
+				//clear element
+				memset(active_connections[i],0,sizeof(esp_bd_addr_t));
+				//last connection
+				if(i == 0) sec_conn = false;
+				
+				//TODO: currently we the first connection id after disconnect.
+				//maybe we should do it differently?
+				if(i != 0) hid_conn_id = 0;
+				
+				ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT: removed from array @%d",i);
+				break;
+			}
+		}
         ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
         esp_ble_gap_start_advertising(&hidd_adv_params);
         xEventGroupSetBits(eventgroup_system,SYSTEM_CURRENTLY_ADVERTISING);
@@ -283,6 +330,10 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         esp_ble_gap_start_advertising(&hidd_adv_params);
         xEventGroupSetBits(eventgroup_system,SYSTEM_CURRENTLY_ADVERTISING);
         break;
+    case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT:
+		if(esp_ble_gap_start_scanning(3600) != ESP_OK) ESP_LOGE(HID_DEMO_TAG,"Cannot start scan");
+		else ESP_LOGI(HID_DEMO_TAG,"Start scan");
+		break;
     case ESP_GAP_BLE_SEC_REQ_EVT:
         for(int i = 0; i < ESP_BD_ADDR_LEN; i++) {
             ESP_LOGD(HID_DEMO_TAG, "%x:",param->ble_security.ble_req.bd_addr[i]);
@@ -317,6 +368,52 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         }
 #endif
         break;
+    //handle scan responses here...    
+	case ESP_GAP_BLE_SCAN_RESULT_EVT: {
+		uint8_t *adv_name = NULL;
+	    uint8_t adv_name_len = 0;
+        esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
+        switch (scan_result->scan_rst.search_evt) {
+			case ESP_GAP_SEARCH_INQ_RES_EVT:
+				//esp_log_buffer_hex(HID_DEMO_TAG, scan_result->scan_rst.bda, 6);
+				//ESP_LOGI(HID_DEMO_TAG, "Searched Adv Data Len %d, Scan Response Len %d", scan_result->scan_rst.adv_data_len, scan_result->scan_rst.scan_rsp_len);
+				adv_name = esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv, ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len);
+				if(adv_name_len == 0) adv_name = esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv, ESP_BLE_AD_TYPE_NAME_SHORT, &adv_name_len);
+				//ESP_LOGI(HID_DEMO_TAG, "Searched Device Name Len %d", adv_name_len);
+				//esp_log_buffer_char(HID_DEMO_TAG, adv_name, adv_name_len);
+				//ESP_LOGI(HID_DEMO_TAG, "\n");
+				if (adv_name != NULL) {
+					//store name to BT addr...
+					esp_log_buffer_hex(HID_DEMO_TAG, scan_result->scan_rst.bda, 6);
+					esp_log_buffer_char(HID_DEMO_TAG, adv_name, adv_name_len);
+					adv_name[adv_name_len] = '\0';
+					char key[13];
+					sprintf(key,"%02X%02X%02X%02X%02X%02X",scan_result->scan_rst.bda[0],scan_result->scan_rst.bda[1], \
+						scan_result->scan_rst.bda[2],scan_result->scan_rst.bda[3],scan_result->scan_rst.bda[4],scan_result->scan_rst.bda[5]);
+					if(nvs_set_str(nvs_bt_name_h,key,(char*)adv_name) == ESP_OK)
+					{
+						ESP_LOGI(HID_DEMO_TAG,"Saved %s to %s",adv_name, key);
+					} else ESP_LOGW(HID_DEMO_TAG,"Error saving %s for %s",adv_name,key);
+				}
+				break;
+			case ESP_GAP_SEARCH_INQ_CMPL_EVT:
+				break;
+			default:
+				break;
+        }
+        
+		}
+        break;
+        
+    case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
+        //scan start complete event to indicate scan start successfully or failed
+        if (param->scan_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+            ESP_LOGE(HID_DEMO_TAG, "scan start failed, error status = %x", param->scan_start_cmpl.status);
+            break;
+        }
+        ESP_LOGI(HID_DEMO_TAG, "Scan start success");
+        break;
+		
     default:
         break;
     }
@@ -330,6 +427,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $PMx (0 or 1)
     // $GP
     // $DPx (number of paired device, starting with 0)
+    // $SW aabbccddeeff (select a BT addr to send the HID commands to)
+    // $GC get connected devices
     // $NAME set name of bluetooth device
 
     if(cmdBuffer->bufferLength < 2) return;
@@ -344,6 +443,67 @@ void processCommand(struct cmdBuf *cmdBuffer)
 
 
     /**++++ commands without parameters ++++*/
+    //get connected devices
+    if(strcmp(input,"GC") == 0)
+    {
+		char hexnum[5];
+		ESP_LOGI(EXT_UART_TAG,"connected devices (starting with index 0):");
+		ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
+		for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+		{
+			esp_bd_addr_t empty = {0,0,0,0,0,0};
+			
+			//only select active connections
+			if(memcmp(active_connections[i],empty,sizeof(esp_bd_addr_t)) != 0)
+			{
+				//print on monitor & external uart
+				if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, "CONNECTED:",strlen("CONNECTED:"));
+				esp_log_buffer_hex(EXT_UART_TAG, active_connections[i], sizeof(esp_bd_addr_t));
+				for (int t=0; t<sizeof(esp_bd_addr_t); t++) {
+					sprintf(hexnum,"%02X ",active_connections[i][t]);
+					if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
+				}
+				if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		}
+		ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
+		return;
+	}
+    //switch between BT devices which are connected...
+    if(input[0] == 'S' && input[1] == 'W')
+    {
+		if(len >= 15)
+		{
+			esp_bd_addr_t newaddr;
+			for(uint8_t i = 0; i<6; i++) {
+				if(input[i*2+3] >= '0' && input[i*2+3] <= '9') newaddr[i] = (input[i*2+3] - '0')<<4;
+				if(input[i*2+3] >= 'a' && input[i*2+3] <= 'f') newaddr[i] = (input[i*2+3] + 10 - 'a')<<4;
+				if(input[i*2+3] >= 'A' && input[i*2+3] <= 'F') newaddr[i] = (input[i*2+3] + 10 - 'A')<<4;
+				
+				if(input[i*2+1+3] >= '0' && input[i*2+1+3] <= '9') newaddr[i] |= input[i*2+1+3] - '0';
+				if(input[i*2+1+3] >= 'a' && input[i*2+1+3] <= 'f') newaddr[i] |= input[i*2+1+3] + 10 - 'a';
+				if(input[i*2+1+3] >= 'A' && input[i*2+1+3] <= 'F') newaddr[i] |= input[i*2+1+3] + 10 - 'A';
+			}
+			esp_log_buffer_hex(HID_DEMO_TAG, newaddr, 6);
+			
+			for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+			{
+				//check if this addr is in the array
+				if(memcmp(active_connections[i],newaddr,sizeof(esp_bd_addr_t)) == 0)
+				{
+					ESP_LOGI(EXT_UART_TAG, "New hid_conn_id: %d",i);
+					hid_conn_id = i;
+					return;
+				}
+			}
+			ESP_LOGW(EXT_UART_TAG,"Cannot find BT MAC in connections");
+		} else {
+			ESP_LOGW(EXT_UART_TAG,"Command to short (need full BT MAC addr): %d",len);
+		}
+		return;
+	}
+    
+    
     //get module ID
     if(strcmp(input,"ID") == 0)
     {
@@ -415,6 +575,21 @@ void processCommand(struct cmdBuf *cmdBuffer)
                             sprintf(hexnum,"%02X ",btdevlist[i].bd_addr[t]);
                             if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
                         }
+                        //print out name
+                        char btname[64];
+                        size_t name_len = 0;
+                        char key[13];
+                        sprintf(key,"%02X%02X%02X%02X%02X%02X",btdevlist[i].bd_addr[0],btdevlist[i].bd_addr[1], \
+							btdevlist[i].bd_addr[2],btdevlist[i].bd_addr[3],btdevlist[i].bd_addr[4],btdevlist[i].bd_addr[5]);
+                        
+                        if(nvs_get_str(nvs_bt_name_h,key,btname,&name_len) == ESP_OK)
+                        {
+							sprintf(hexnum," - ");
+							if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
+							if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, btname, name_len);
+							ESP_LOGI(EXT_UART_TAG,"%s",btname);
+						} else ESP_LOGW(EXT_UART_TAG,"cannot find name for addr.");
+                        
                         if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
                     }
                     ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
@@ -772,6 +947,11 @@ void app_main(void)
     if((ret = esp_hidd_profile_init()) != ESP_OK) {
         ESP_LOGE(HID_DEMO_TAG, "%s init bluedroid failed\n", __func__);
     }
+    
+    //open NVS handle for storing BT device names
+    ESP_LOGI("MAIN","opening NVS handle for BT names");
+    ret = nvs_open("btnames", NVS_READWRITE, &nvs_bt_name_h);
+    if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS for bt names");
 
     // Read config
     nvs_handle my_handle;
@@ -817,6 +997,9 @@ void app_main(void)
     and the init key means which key you can distribute to the slave. */
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+    
+    //start active scan
+    if(esp_ble_gap_set_scan_params(&scan_params) != ESP_OK) ESP_LOGE("MAIN","Cannot set scan params");
 
     xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
     xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);

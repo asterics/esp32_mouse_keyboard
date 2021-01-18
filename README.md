@@ -81,6 +81,7 @@ _Note:_ We do not test these on a regular basis!
 |$SW|Switch between devices|BT addr (001122334455)|Switch between connected devices, the given BT addr will receive the HID packets|
 |$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
 |$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
+|$RL|Set BLE rate limiter|0-100000|Set the minimum time between two BLE GATT indicates (HID reports), if enabled in menuconfig. __Note:__ Values above 5000 are not practical, mouse reports are sent very slowly!|
 |$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
 
 ### HID input

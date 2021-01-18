@@ -61,7 +61,7 @@
 /**
  * Brief:
  * This example Implemented BLE HID device profile related functions, in which the HID device
- * has 4 Reports (1 is mouse, 2 is keyboard and LED, 3 is Consumer Devices, 4 is Vendor devices).
+ * has 4 Reports (1 is mouse, 2 is keyboard and LED, 3 is Consumer Devices, 4 is Joystick).
  * Users can choose different reports according to their own application scenarios.
  * BLE HID profile inheritance and USB HID class.
  */
@@ -103,7 +103,6 @@ nvs_handle nvs_bt_name_h;
 
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
-static bool send_volum_up = false;
 #define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
 
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
@@ -430,6 +429,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $SW aabbccddeeff (select a BT addr to send the HID commands to)
     // $GC get connected devices
     // $NAME set name of bluetooth device
+    // $RL<0-100000>
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -668,6 +668,25 @@ void processCommand(struct cmdBuf *cmdBuffer)
         else ESP_LOGI(EXT_UART_TAG,"NAME: given bt name is too long or too short");
         return;
     }
+    
+    //set rate limiter interval
+    #if CONFIG_MODULE_USERATELIMITER
+    if(strncmp(input,"RL",2) == 0)
+    {
+		int newinterval;
+        if (!(get_int(input,2,&newinterval))) {
+            ESP_LOGE(EXT_UART_TAG,"RL: cannot parse, need integer <0-100000>");
+            return;
+        }
+        if(newinterval < 100 || newinterval > 100000) {
+            ESP_LOGE(EXT_UART_TAG,"RL: invalid parameter, need integer <100-100000>");
+            return;
+        }
+        ESP_LOGI(EXT_UART_TAG,"RL: rate limit interval set from %d to %d", esp_hidd_get_interval(), newinterval);
+        esp_hidd_set_interval(newinterval);
+        return;
+	}
+    #endif
 
     ESP_LOGE(EXT_UART_TAG,"No command executed with: %s ; len= %d\n",input,len);
 }
@@ -690,9 +709,9 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 
     case CMDSTATE_GET_RAW:
         cmdBuffer->buf[cmdBuffer->bufferLength]=character;
-        if ((cmdBuffer->bufferLength == 1) && (character==0x01)) { // we have a joystick report: increase by 4 bytes
+        if ((cmdBuffer->bufferLength == 1) && (character==0x01)) { // we have a joystick report: increase by 6 bytes
             cmdBuffer->expectedBytes += 6;
-            //ESP_LOGI(EXT_UART_TAG,"expecting 4 more bytes for joystick");
+            //ESP_LOGI(EXT_UART_TAG,"expecting 6 more bytes for joystick");
         }
 
         cmdBuffer->bufferLength++;
@@ -701,15 +720,23 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
             if(sec_conn == false) {
                 ESP_LOGI(EXT_UART_TAG,"not connected, cannot send report");
             } else {
+				/////// Keyboard
                 if (cmdBuffer->buf[1] == 0x00) {   // keyboard report
                     esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+                    
+                /////// Joystick
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
-                    ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-                    //uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
-                    //memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
-                    ///@todo esp_hidd_send_joystick_value...
+					#if CONFIG_MODULE_USEJOYSTICK
+						///@todo enable if joystick is implemented.
+						//esp_hidd_send_joystick_value(hid_conn_id,&cmdBuffer->buf[2],12);
+					#else
+						ESP_LOGE(EXT_UART_TAG,"Got joystick report, although joystick is not built-in!");
+					#endif /* CONFIG_MODULE_USEJOYSTICK */
+                    //ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+                    
+                /////// Mouse
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
-                    esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+					esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
                 }
                 else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
             }
@@ -740,7 +767,6 @@ void uart_external_task(void *pvParameters)
 {
     char character;
     struct cmdBuf cmdBuffer;
-
 
     //Install UART driver, and get the queue.
     esp_err_t ret = ESP_OK;

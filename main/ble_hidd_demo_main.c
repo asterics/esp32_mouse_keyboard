@@ -740,6 +740,32 @@ void uart_external_task(void *pvParameters)
 {
     char character;
     struct cmdBuf cmdBuffer;
+    int changePinning = 0;
+    
+    /*  determine if we should switch RX/TX pins.  */
+    /*   we enable the RX pin as GPIO with pull-down.
+     * 	 if "1" is read, this is the "real" RX pin. If not, it
+     *   should be the TX pin. */
+    
+    gpio_config_t io_conf;
+    //disable interrupt
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    //set as output mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //bit mask, we want to set the RX pin as input
+    io_conf.pin_bit_mask = (1ULL<<EX_SERIAL_RXPIN);
+    //disable pull-down mode
+    io_conf.pull_down_en = 1;
+    //disable pull-up mode
+    io_conf.pull_up_en = 0;
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);  
+    
+    if(!gpio_get_level(EX_SERIAL_RXPIN))
+    {
+		ESP_LOGW(EXT_UART_TAG,"Switching pins!");
+		changePinning = 1;
+	}
 
 
     //Install UART driver, and get the queue.
@@ -760,7 +786,8 @@ void uart_external_task(void *pvParameters)
     }
 
     //set IO pins
-    ret = uart_set_pin(EX_UART_NUM, EX_SERIAL_TXPIN, EX_SERIAL_RXPIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if(changePinning) ret = uart_set_pin(EX_UART_NUM, EX_SERIAL_RXPIN, EX_SERIAL_TXPIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    else ret = uart_set_pin(EX_UART_NUM, EX_SERIAL_TXPIN, EX_SERIAL_RXPIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if(ret != ESP_OK)
     {
         ESP_LOGE(EXT_UART_TAG,"external UART set pin failed");
@@ -889,8 +916,8 @@ void uart_console_task(void *pvParameters)
     }
 }
 
-
-void app_main(void)
+void main_task(void) __attribute__((weak));
+void main_task(void)
 {
     esp_err_t ret;
 
@@ -1007,3 +1034,7 @@ void app_main(void)
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
 }
 
+void app_main()
+{
+	main_task();
+}

@@ -918,8 +918,7 @@ void uart_console_task(void *pvParameters)
     }
 }
 
-void main_task(void) __attribute__((weak));
-void main_task(void)
+void app_main(void)
 {
     esp_err_t ret;
 
@@ -1034,9 +1033,4 @@ void main_task(void)
     xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
     ///@todo maybe reduce stack size for blink task? 4k words for blinky :-)?
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
-}
-
-void app_main()
-{
-	main_task();
 }

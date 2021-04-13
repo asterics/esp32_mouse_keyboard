@@ -759,7 +759,9 @@ void uart_external_task(void *pvParameters)
     //disable pull-up mode
     io_conf.pull_up_en = 0;
     //configure GPIO with the given settings
-    gpio_config(&io_conf);  
+    gpio_config(&io_conf);
+    
+    vTaskDelay(1);
     
     if(!gpio_get_level(EX_SERIAL_RXPIN))
     {

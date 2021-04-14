@@ -430,6 +430,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $SW aabbccddeeff (select a BT addr to send the HID commands to)
     // $GC get connected devices
     // $NAME set name of bluetooth device
+    // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
+    // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -439,8 +441,89 @@ void processCommand(struct cmdBuf *cmdBuffer)
     const char *nl = "\r\n";
     esp_ble_bond_dev_t * btdevlist;
     int counter;
+    esp_err_t ret;
 
-
+	/**++++ key/value storing ++++*/
+	if(strncmp(input,"GV ", 3) == 0)
+	{
+		//remove GV command name
+		strsep(&input, " ");
+		//get key
+		key = strsep(&input, " ");
+		
+		//get data size from NVS, check if key is set
+		size_t sizeData;
+		char* nvspayload = NULL;
+		ret = nvs_get_str(nvs_storage_h, key,NULL,&sizeData);
+		
+		//if we have a data length, load string
+		if(ret == ESP_OK)
+		{
+			//load str data
+			nvspayload = malloc(sizeData);
+			ret = nvs_get_str(my_handle, key, nvspayload, &sizeData);
+		}
+		
+		//OK or error?
+		if(ret != ESP_OK)
+		{
+			//send back error message
+			ESP_LOGE(EXT_UART_TAG,"error reading value: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			ESP_LOGI(EXT_UART_TAG,"loaded - %s:%s",key,nvspayload);
+			uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
+			uart_write_bytes(EX_UART_NUM, nvspayload, strlen(nvspayload));
+			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+		}
+		
+		//done with the payload
+		if(nvspayload) free(nvspayload);
+	}
+	
+	if(strncmp(input,"SV ", 3) == 0)
+	{
+		//remove SV command name
+		strsep(&input, " ");
+		//get key
+		char* key = strsep(&input, " ");
+		//get payload
+		char* nvspayload = strsep(&input, " ");
+		
+		//try to set string data to nvs
+		ret = nvs_set_str(nvs_storage_h, key,nvspayload);
+		
+		if(ret == ESP_OK)
+		{
+			//commit NVS storage
+			ret = nvs_commit(nvs_storage_h);
+		}
+		
+		if(ret != ESP_OK)
+		{
+			//send back error message
+			ESP_LOGE(EXT_UART_TAG,"error setting string: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			//send back OK
+			ESP_LOGI(EXT_UART_TAG,"set - %s:%s",key,nvspayload);
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:OK", strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		}
+	}
 
     /**++++ commands without parameters ++++*/
     //get connected devices

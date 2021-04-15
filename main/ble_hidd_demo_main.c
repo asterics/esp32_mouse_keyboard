@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  *
- * Copyright 2020, Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>
+ * Copyright 2020, Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>, Junaid Khan <junaid.khan.wien@gmail.com>
  *
  * This file is mostly based on the Espressif ESP32 BLE HID example.
  * Adaption were made for:
@@ -23,6 +23,7 @@
  * * console input for testing purposes
  * * Joystick support (replacing vendor report)
  * * command input via UART for controlling the BLE interface (get & delete pairings,...)
+ * * Firmware update possible via UART (factory partition required)
  *
  */
 

@@ -82,6 +82,7 @@ _Note:_ We do not test these on a regular basis!
 |$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
 |$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
 |$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
+|$UG|Initiating firmware update|--|Boot partition is set to 'factory', if available. Device is restarted and expects firmware (.bin) via UART2|
 
 ### HID input
 

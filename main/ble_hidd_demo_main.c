@@ -515,11 +515,16 @@ void processCommand(struct cmdBuf *cmdBuffer)
 				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
 			}
 		} else {
-			//send back OK
-			ESP_LOGI(EXT_UART_TAG,"set - %s:%s",key,nvspayload);
+			//send back OK & used/free entries
+			nvs_stats_t nvs_stats;
+			nvs_get_stats(NULL, &nvs_stats);
+			ESP_LOGI(EXT_UART_TAG,"set - %s:%s - used:%d,free:%d",key,nvspayload,nvs_stats.used_entries, nvs_stats.free_entries);
 			if(cmdBuffer->sendToUART != 0) 
 			{
-				uart_write_bytes(EX_UART_NUM, "NVS:OK", strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM, "NVS:OK ", strlen(esp_err_to_name(ret)));
+				char stats[64];
+				sprintf(stats,"%d/%d - used/free",nvs_stats.used_entries, nvs_stats.free_entries);
+				uart_write_bytes(EX_UART_NUM,stats,strnlen(stats,64));
 				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
 			}
 		}

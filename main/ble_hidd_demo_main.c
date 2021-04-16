@@ -439,6 +439,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $NAME set name of bluetooth device
     // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
     // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
+    // $CV clear all key/value pairs set with $SV
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -451,6 +452,22 @@ void processCommand(struct cmdBuf *cmdBuffer)
     esp_err_t ret;
 
 	/**++++ key/value storing ++++*/
+	if(strncmp(input,"CV ", 2) == 0)
+	{
+		//no error checks here, because all errors
+		//are related to the NVS part, which cannot be fixed via
+		//the UART console
+		nvs_erase_all(nvs_storage_h);
+		//commit NVS storage
+		ret = nvs_commit(nvs_storage_h);
+		ESP_LOGI(EXT_UART_TAG,"cleared all NVS key/value pairs");
+		if(cmdBuffer->sendToUART != 0) 
+		{
+			uart_write_bytes(EX_UART_NUM, "NVS:OK",strlen("NVS:OK"));
+			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+		}
+		return;
+	}
 	if(strncmp(input,"GV ", 3) == 0)
 	{
 		char* work = (char*)cmdBuffer->buf;

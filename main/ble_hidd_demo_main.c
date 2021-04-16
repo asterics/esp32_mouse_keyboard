@@ -101,6 +101,13 @@
  * In NVS, we store the BT addr as key and the name as value. */
 nvs_handle nvs_bt_name_h;
 
+/** @brief NVS handle to store key/value pairs via UART
+ * 
+ * In NVS, we store arbitrary values, which are sent via UART.
+ * This can(will) be used for storing different values from the
+ * GUI on the ESP32. */
+nvs_handle nvs_storage_h;
+
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
@@ -446,10 +453,11 @@ void processCommand(struct cmdBuf *cmdBuffer)
 	/**++++ key/value storing ++++*/
 	if(strncmp(input,"GV ", 3) == 0)
 	{
+		char* work = (char*)cmdBuffer->buf;
 		//remove GV command name
-		strsep(&input, " ");
+		strsep(&work, " ");
 		//get key
-		key = strsep(&input, " ");
+		char *key = strsep(&work, " ");
 		
 		//get data size from NVS, check if key is set
 		size_t sizeData;
@@ -461,7 +469,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		{
 			//load str data
 			nvspayload = malloc(sizeData);
-			ret = nvs_get_str(my_handle, key, nvspayload, &sizeData);
+			ret = nvs_get_str(nvs_storage_h, key, nvspayload, &sizeData);
 		}
 		
 		//OK or error?
@@ -484,16 +492,29 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		
 		//done with the payload
 		if(nvspayload) free(nvspayload);
+		return;
 	}
 	
 	if(strncmp(input,"SV ", 3) == 0)
 	{
+		char* work = (char*)cmdBuffer->buf;
 		//remove SV command name
-		strsep(&input, " ");
+		strsep(&work, " ");
 		//get key
-		char* key = strsep(&input, " ");
+		char* key = strsep(&work, " ");
 		//get payload
-		char* nvspayload = strsep(&input, " ");
+		char* nvspayload = work;
+		
+		if(work == NULL)
+		{
+			ESP_LOGE(EXT_UART_TAG,"error setting string: no value provided");
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:ESP_ERR_NVS_NO_VALUE",strlen("NVS:ESP_ERR_NVS_NO_VALUE"));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+			return;
+		}
 		
 		//try to set string data to nvs
 		ret = nvs_set_str(nvs_storage_h, key,nvspayload);
@@ -528,6 +549,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
 				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
 			}
 		}
+		return;
 	}
 
     /**++++ commands without parameters ++++*/
@@ -1040,7 +1062,12 @@ void app_main(void)
     ESP_LOGI("MAIN","opening NVS handle for BT names");
     ret = nvs_open("btnames", NVS_READWRITE, &nvs_bt_name_h);
     if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS for bt names");
-
+    
+    //open NVS handle for key/value storage via UART
+    ESP_LOGI("MAIN","opening NVS handle for key/value storage");
+    ret = nvs_open("kvstorage", NVS_READWRITE, &nvs_storage_h);
+    if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS for key/value storage");
+    
     // Read config
     nvs_handle my_handle;
     ESP_LOGI("MAIN","loading configuration from NVS");

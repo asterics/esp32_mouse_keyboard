@@ -82,6 +82,9 @@ _Note:_ We do not test these on a regular basis!
 |$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
 |$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
 |$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
+|$SV|Set a key/value pair |key value| Set a value to ESP32 NVS storage, e.g. "$SV testkey This is a testvalue". Note: no spaces in the key! Returns "OK xx/yy used/free" on success, NVS:"error code" otherwise.|
+|$GV|Get a key/value pair |key| Get a value from ESP32 NVS storage, e.g. "$GV testkey". Note: no spaces in the key!|
+|$CV|Clear all key/value pairs |--| Delete all stored key/value pairs from $SV.|
 
 ### HID input
 

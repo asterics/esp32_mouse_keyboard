@@ -386,7 +386,6 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 				//ESP_LOGI(HID_DEMO_TAG, "\n");
 				if (adv_name != NULL) {
 					//store name to BT addr...
-					/*
 					esp_log_buffer_hex(HID_DEMO_TAG, scan_result->scan_rst.bda, 6);
 					esp_log_buffer_char(HID_DEMO_TAG, adv_name, adv_name_len);
 					adv_name[adv_name_len] = '\0';
@@ -397,7 +396,6 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 					{
 						ESP_LOGI(HID_DEMO_TAG,"Saved %s to %s",adv_name, key);
 					} else ESP_LOGW(HID_DEMO_TAG,"Error saving %s for %s",adv_name,key);
-					*/
 				}
 				break;
 			case ESP_GAP_SEARCH_INQ_CMPL_EVT:

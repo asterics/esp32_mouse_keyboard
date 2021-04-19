@@ -101,6 +101,13 @@
  * In NVS, we store the BT addr as key and the name as value. */
 nvs_handle nvs_bt_name_h;
 
+/** @brief NVS handle to store key/value pairs via UART
+ * 
+ * In NVS, we store arbitrary values, which are sent via UART.
+ * This can(will) be used for storing different values from the
+ * GUI on the ESP32. */
+nvs_handle nvs_storage_h;
+
 static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
@@ -430,6 +437,9 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $SW aabbccddeeff (select a BT addr to send the HID commands to)
     // $GC get connected devices
     // $NAME set name of bluetooth device
+    // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
+    // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
+    // $CV clear all key/value pairs set with $SV
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -439,8 +449,125 @@ void processCommand(struct cmdBuf *cmdBuffer)
     const char *nl = "\r\n";
     esp_ble_bond_dev_t * btdevlist;
     int counter;
+    esp_err_t ret;
 
-
+	/**++++ key/value storing ++++*/
+	if(strncmp(input,"CV ", 2) == 0)
+	{
+		//no error checks here, because all errors
+		//are related to the NVS part, which cannot be fixed via
+		//the UART console
+		nvs_erase_all(nvs_storage_h);
+		//commit NVS storage
+		ret = nvs_commit(nvs_storage_h);
+		ESP_LOGI(EXT_UART_TAG,"cleared all NVS key/value pairs");
+		if(cmdBuffer->sendToUART != 0) 
+		{
+			uart_write_bytes(EX_UART_NUM, "NVS:OK",strlen("NVS:OK"));
+			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+		}
+		return;
+	}
+	if(strncmp(input,"GV ", 3) == 0)
+	{
+		char* work = (char*)cmdBuffer->buf;
+		//remove GV command name
+		strsep(&work, " ");
+		//get key
+		char *key = strsep(&work, " ");
+		
+		//get data size from NVS, check if key is set
+		size_t sizeData;
+		char* nvspayload = NULL;
+		ret = nvs_get_str(nvs_storage_h, key,NULL,&sizeData);
+		
+		//if we have a data length, load string
+		if(ret == ESP_OK)
+		{
+			//load str data
+			nvspayload = malloc(sizeData);
+			ret = nvs_get_str(nvs_storage_h, key, nvspayload, &sizeData);
+		}
+		
+		//OK or error?
+		if(ret != ESP_OK)
+		{
+			//send back error message
+			ESP_LOGE(EXT_UART_TAG,"error reading value: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			ESP_LOGI(EXT_UART_TAG,"loaded - %s:%s",key,nvspayload);
+			uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
+			uart_write_bytes(EX_UART_NUM, nvspayload, strlen(nvspayload));
+			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+		}
+		
+		//done with the payload
+		if(nvspayload) free(nvspayload);
+		return;
+	}
+	
+	if(strncmp(input,"SV ", 3) == 0)
+	{
+		char* work = (char*)cmdBuffer->buf;
+		//remove SV command name
+		strsep(&work, " ");
+		//get key
+		char* key = strsep(&work, " ");
+		//get payload
+		char* nvspayload = work;
+		
+		if(work == NULL)
+		{
+			ESP_LOGE(EXT_UART_TAG,"error setting string: no value provided");
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:ESP_ERR_NVS_NO_VALUE",strlen("NVS:ESP_ERR_NVS_NO_VALUE"));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+			return;
+		}
+		
+		//try to set string data to nvs
+		ret = nvs_set_str(nvs_storage_h, key,nvspayload);
+		
+		if(ret == ESP_OK)
+		{
+			//commit NVS storage
+			ret = nvs_commit(nvs_storage_h);
+		}
+		
+		if(ret != ESP_OK)
+		{
+			//send back error message
+			ESP_LOGE(EXT_UART_TAG,"error setting string: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			//send back OK & used/free entries
+			nvs_stats_t nvs_stats;
+			nvs_get_stats(NULL, &nvs_stats);
+			ESP_LOGI(EXT_UART_TAG,"set - %s:%s - used:%d,free:%d",key,nvspayload,nvs_stats.used_entries, nvs_stats.free_entries);
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "NVS:OK ", strlen("NVS:OK "));
+				char stats[64];
+				sprintf(stats,"%d/%d - used/free",nvs_stats.used_entries, nvs_stats.free_entries);
+				uart_write_bytes(EX_UART_NUM,stats,strnlen(stats,64));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		}
+		return;
+	}
 
     /**++++ commands without parameters ++++*/
     //get connected devices
@@ -952,7 +1079,12 @@ void app_main(void)
     ESP_LOGI("MAIN","opening NVS handle for BT names");
     ret = nvs_open("btnames", NVS_READWRITE, &nvs_bt_name_h);
     if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS for bt names");
-
+    
+    //open NVS handle for key/value storage via UART
+    ESP_LOGI("MAIN","opening NVS handle for key/value storage");
+    ret = nvs_open("kvstorage", NVS_READWRITE, &nvs_storage_h);
+    if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS for key/value storage");
+    
     // Read config
     nvs_handle my_handle;
     ESP_LOGI("MAIN","loading configuration from NVS");

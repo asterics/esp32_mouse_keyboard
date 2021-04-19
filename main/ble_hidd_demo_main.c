@@ -559,7 +559,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
 			ESP_LOGI(EXT_UART_TAG,"set - %s:%s - used:%d,free:%d",key,nvspayload,nvs_stats.used_entries, nvs_stats.free_entries);
 			if(cmdBuffer->sendToUART != 0) 
 			{
-				uart_write_bytes(EX_UART_NUM, "NVS:OK ", strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM, "NVS:OK ", strlen("NVS:OK "));
 				char stats[64];
 				sprintf(stats,"%d/%d - used/free",nvs_stats.used_entries, nvs_stats.free_entries);
 				uart_write_bytes(EX_UART_NUM,stats,strnlen(stats,64));

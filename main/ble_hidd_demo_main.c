@@ -15,7 +15,9 @@
  * MA 02110-1301, USA.
  *
  *
- * Copyright 2020, Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>, Junaid Khan <junaid.khan.wien@gmail.com>
+ * Copyright 2020-2021:
+ * Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>, 
+ * Junaid Khan <junaid.khan.wien@gmail.com>
  *
  * This file is mostly based on the Espressif ESP32 BLE HID example.
  * Adaption were made for:
@@ -442,6 +444,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
     // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
     // $CV clear all key/value pairs set with $SV
+    // $UG start flash update by searching for factory partition and rebooting there.
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
@@ -809,18 +812,22 @@ void processCommand(struct cmdBuf *cmdBuffer)
             const esp_partition_t* factory = esp_partition_get(pi);
             esp_partition_iterator_release(pi);
             if (esp_ota_set_boot_partition(factory) == ESP_OK) {
-                uart_write_bytes(EX_UART_NUM, "Factory partition found - restarting esp in upgrade mode", strlen("Factory partition found - restarting esp in upgrade mode"));
+                uart_write_bytes(EX_UART_NUM, "OTA:start", strlen("OTA:start"));
                 uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
 				ESP_LOGI(EXT_UART_TAG, "Addon board in upgrade mode");
                 esp_restart();
             }
             else {
-                ESP_LOGI(EXT_UART_TAG, "Factory partition not found");
-                uart_write_bytes(EX_UART_NUM, "Factory partition not found - flash factory partition first", strlen("Factory partition not found - flash factory partition first"));
+                ESP_LOGI(EXT_UART_TAG, "Booting factory partition not possible");
+                uart_write_bytes(EX_UART_NUM, "OTA:not possible", strlen("OTA:not possible"));
                 uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
             }
-            return;
-        }
+        } else {
+			ESP_LOGI(EXT_UART_TAG, "Factory partition not found");
+			uart_write_bytes(EX_UART_NUM, "OTA:not possible", strlen("OTA:not possible"));
+			uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+		}
+        return;
     }
     ESP_LOGE(EXT_UART_TAG,"No command executed with: %s ; len= %d\n",input,len);
 }

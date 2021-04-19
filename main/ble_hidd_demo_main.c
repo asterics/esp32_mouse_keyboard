@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  *
- * Copyright 2020, Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>
+ * Copyright 2020, Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>, Junaid Khan <junaid.khan.wien@gmail.com>
  *
  * This file is mostly based on the Espressif ESP32 BLE HID example.
  * Adaption were made for:
@@ -23,6 +23,7 @@
  * * console input for testing purposes
  * * Joystick support (replacing vendor report)
  * * command input via UART for controlling the BLE interface (get & delete pairings,...)
+ * * Firmware update possible via UART (factory partition required)
  *
  */
 
@@ -57,6 +58,7 @@
 #include "driver/uart.h"
 #include "hid_dev.h"
 #include "config.h"
+#include "esp_ota_ops.h"
 
 /**
  * Brief:
@@ -796,6 +798,30 @@ void processCommand(struct cmdBuf *cmdBuffer)
         return;
     }
 
+    //UG: triggering update mode of ESP by restarting into "factory partition"
+    if (strcmp(input, "UG") == 0)
+    {
+        esp_partition_iterator_t pi;
+
+        pi = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+
+        if (pi != NULL) {
+            const esp_partition_t* factory = esp_partition_get(pi);
+            esp_partition_iterator_release(pi);
+            if (esp_ota_set_boot_partition(factory) == ESP_OK) {
+                uart_write_bytes(EX_UART_NUM, "Factory partition found - restarting esp in upgrade mode", strlen("Factory partition found - restarting esp in upgrade mode"));
+                uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+				ESP_LOGI(EXT_UART_TAG, "Addon board in upgrade mode");
+                esp_restart();
+            }
+            else {
+                ESP_LOGI(EXT_UART_TAG, "Factory partition not found");
+                uart_write_bytes(EX_UART_NUM, "Factory partition not found - flash factory partition first", strlen("Factory partition not found - flash factory partition first"));
+                uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+            }
+            return;
+        }
+    }
     ESP_LOGE(EXT_UART_TAG,"No command executed with: %s ; len= %d\n",input,len);
 }
 

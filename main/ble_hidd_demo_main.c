@@ -291,6 +291,18 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
 		} else {
 			ESP_LOGE(HID_DEMO_TAG,"Oups, hid_conn_id too high!");
 		}
+		
+		//because some devices do connect with a quite high connection
+		//interval, we might have a congested channel...
+		//to overcome this issue, we update the connection parameters here
+		//to use a very low connection interval.
+		esp_ble_conn_update_params_t new;
+		memcpy(new.bda,param->connect.remote_bda,sizeof(esp_bd_addr_t));
+		new.min_int = 6;
+		new.max_int = 6;
+		new.latency = 0;
+		new.timeout = 500;
+		esp_ble_gap_update_conn_params(&new);
         
         //to allow more connections, we simply restart the adv process.
         esp_ble_gap_start_advertising(&hidd_adv_params);
@@ -324,10 +336,23 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
     case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT: {
         ESP_LOGI(HID_DEMO_TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT", __func__);
         ESP_LOG_BUFFER_HEX(HID_DEMO_TAG, param->vendor_write.data, param->vendor_write.length);
+        break;
     }
     case ESP_HIDD_EVENT_BLE_LED_OUT_WRITE_EVT: {
         ESP_LOGI(HID_DEMO_TAG, "%s, ESP_HIDD_EVENT_BLE_LED_OUT_WRITE_EVT, keyboard LED value: %d", __func__, param->vendor_write.data[0]);
+        break;
     }
+    
+    case ESP_HIDD_EVENT_BLE_CONGEST: {
+		if(param->congest.congested)
+		{
+			ESP_LOGI(HID_DEMO_TAG, "Congest: %d, conn: %d",param->congest.congested,param->congest.conn_id);
+			esp_gap_conn_params_t current;
+			esp_ble_get_current_conn_params(active_connections[param->congest.conn_id],&current);
+			ESP_LOGI(HID_DEMO_TAG, "Interval: %d, latency: %d, timeout: %d",current.interval, current.latency, current.timeout);
+		}
+		break;
+	}
     default:
         break;
     }
@@ -870,6 +895,7 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                     ///@todo esp_hidd_send_joystick_value...
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
                     esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+                    ESP_LOGI(EXT_UART_TAG,"m: %d/%d",cmdBuffer->buf[3],cmdBuffer->buf[4]);
                 }
                 else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
             }
@@ -1192,7 +1218,7 @@ void app_main(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
     
     //start active scan
-    if(esp_ble_gap_set_scan_params(&scan_params) != ESP_OK) ESP_LOGE("MAIN","Cannot set scan params");
+    //if(esp_ble_gap_set_scan_params(&scan_params) != ESP_OK) ESP_LOGE("MAIN","Cannot set scan params");
 
     xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
     xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);

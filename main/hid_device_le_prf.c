@@ -641,6 +641,19 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
             }
             break;
          }
+         
+        case ESP_GATTS_CONGEST_EVT: {
+			esp_hidd_cb_param_t cb_param = {0};
+			ESP_LOGV(HID_LE_PRF_TAG, "Congest EVT, conn_id = %x",param->congest.conn_id);
+			cb_param.congest.congested = param->congest.congested;
+			cb_param.congest.conn_id = param->congest.conn_id;
+            if(hidd_le_env.hidd_cb != NULL) {
+                (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_CONGEST, &cb_param);
+            }
+            break;
+		}
+		
+         
 
         default:
 			ESP_LOGI(HID_LE_PRF_TAG,"GATT EVT %d",event);

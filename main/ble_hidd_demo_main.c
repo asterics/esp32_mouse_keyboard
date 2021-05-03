@@ -889,13 +889,13 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                 if (cmdBuffer->buf[1] == 0x00) {   // keyboard report
                     esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
-                    ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+                    //ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
                     //uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
                     //memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
                     ///@todo esp_hidd_send_joystick_value...
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
                     esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-                    ESP_LOGI(EXT_UART_TAG,"m: %d/%d",cmdBuffer->buf[3],cmdBuffer->buf[4]);
+                    //ESP_LOGI(EXT_UART_TAG,"m: %d/%d",cmdBuffer->buf[3],cmdBuffer->buf[4]);
                 }
                 else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
             }

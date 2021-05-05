@@ -42,6 +42,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "esp_timer.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -116,6 +117,27 @@ static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
 #define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
+
+
+/** Timestamp of last sent HID packet, used for idle sending timer callback 
+ * @see periodicHIDCallback */
+uint64_t timestampLastSent;
+
+/** Last mouse button state.
+ * Due to the absolute values for mouse buttons, we need to keep track.
+ * Because when the mouse button is pressed and hold (without steady movement),
+ * the idle callback will send an empty report (X/Y/wheel are 0), but
+ * the mousebuttons must be the same
+ * @see periodicHIDCallback */
+uint8_t mouseButtons = 0;
+
+/** "Keepalive" rate when in idle (no HID commands)
+ * @note Microseconds!
+ * @see timestampLastSent
+ * @see periodicHIDCallback */
+#define HID_IDLE_UPDATE_RATE 200000
+
+
 
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
 
@@ -244,6 +266,19 @@ int get_int(const char * input, int index, int * value)
         return (index);
     }
     return(0);
+}
+
+/** Periodic sending of empty HID reports if no updates are sent via API */
+static void periodicHIDCallback(void* arg)
+{
+	if(abs(esp_timer_get_time()-timestampLastSent) > HID_IDLE_UPDATE_RATE)
+	{
+		//send empty report (but with last known button state)
+		esp_hidd_send_mouse_value(hid_conn_id,mouseButtons,0,0,0);
+		//save timestamp for next call
+		timestampLastSent = esp_timer_get_time();
+		ESP_LOGI(HID_DEMO_TAG,"Idle...");
+	}
 }
 
 
@@ -888,6 +923,8 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
             } else {
                 if (cmdBuffer->buf[1] == 0x00) {   // keyboard report
                     esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+                    //update timestamp
+                    timestampLastSent = esp_timer_get_time();
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
                     //ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
                     //uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
@@ -895,6 +932,10 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                     ///@todo esp_hidd_send_joystick_value...
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
                     esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+                    //update timestamp
+                    timestampLastSent = esp_timer_get_time();
+                    //and save mouse button state
+                    mouseButtons = cmdBuffer->buf[2];
                     //ESP_LOGI(EXT_UART_TAG,"m: %d/%d",cmdBuffer->buf[3],cmdBuffer->buf[4]);
                 }
                 else ESP_LOGE(EXT_UART_TAG,"Unknown RAW HID packet");
@@ -1224,4 +1265,15 @@ void app_main(void)
     xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
     ///@todo maybe reduce stack size for blink task? 4k words for blinky :-)?
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
+    
+    //start periodic timer to send HID reports
+    const esp_timer_create_args_t periodic_timer_args = {
+            .callback = &periodicHIDCallback,
+            /* name is optional, but may help identify the timer when debugging */
+            .name = "HIDidle"
+    };
+    esp_timer_handle_t periodic_timer;
+    esp_timer_create(&periodic_timer_args, &periodic_timer);
+    //call every 100ms
+    esp_timer_start_periodic(periodic_timer, 100000);
 }

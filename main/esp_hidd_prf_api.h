@@ -32,6 +32,7 @@ typedef enum {
     ESP_HIDD_EVENT_BLE_DISCONNECT,
     ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT,
     ESP_HIDD_EVENT_BLE_LED_OUT_WRITE_EVT,
+    ESP_HIDD_EVENT_BLE_CONGEST,
 } esp_hidd_cb_event_t;
 
 /// HID config status
@@ -88,6 +89,14 @@ typedef union {
         uint16_t conn_id;
         esp_bd_addr_t remote_bda;                   /*!< HID Remote bluetooth connection index */
     } connect;									    /*!< HID callback param of ESP_HIDD_EVENT_CONNECT */
+
+    /**
+     * @brief ESP_HIDD_EVENT_CONGEST
+	 */
+    struct hidd_congest_evt_param {
+        uint16_t conn_id;
+        bool congested;                   /*!< congested? */
+    } congest;									    /*!< HID callback param of ESP_HIDD_EVENT_CONGEST */
 
     /**
      * @brief ESP_HIDD_EVENT_DISCONNECT

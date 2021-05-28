@@ -3,17 +3,17 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 	config MODULE_RX_PIN
 		int "RX pin for command/HID UART"
 		default 17
-        range 1 25
+        range 1 39
         
 	config MODULE_TX_PIN
 		int "TX pin for command/HID UART"
 		default 16
-        range 1 25
+        range 1 39
         
 	config MODULE_LED_PIN
 		int "LED connection indicator pin"
 		default 5
-        range 1 25
+        range 1 39
     
     config MODULE_UART_NR
 		int "UART interface number"

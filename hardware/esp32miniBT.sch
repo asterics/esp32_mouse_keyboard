@@ -5,9 +5,9 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 1
 Title "ESP32 miniBT"
-Date "2018-06-03"
-Rev "1.0"
-Comp "by CV / AsTeRICS Foundation"
+Date "2021-06-21"
+Rev "2.1"
+Comp "by Junaid Akhter Khan, Benjamin Aigner & Chris Veigl"
 Comment1 ""
 Comment2 "thanks to github.com/asukiaaa/esp32bb"
 Comment3 "ESP32 miniBT module for FlipMouse"
@@ -57,23 +57,23 @@ $EndComp
 $Comp
 L power:+3V3 #PWR04
 U 1 1 586B907B
-P 3350 1350
-F 0 "#PWR04" H 3350 1200 50  0001 C CNN
-F 1 "+3V3" H 3350 1490 50  0000 C CNN
-F 2 "" H 3350 1350 50  0000 C CNN
-F 3 "" H 3350 1350 50  0000 C CNN
-	1    3350 1350
+P 2900 1200
+F 0 "#PWR04" H 2900 1050 50  0001 C CNN
+F 1 "+3V3" H 2900 1340 50  0000 C CNN
+F 2 "" H 2900 1200 50  0000 C CNN
+F 3 "" H 2900 1200 50  0000 C CNN
+	1    2900 1200
 	1    0    0    -1  
 $EndComp
 $Comp
 L power:GND #PWR05
 U 1 1 586B90BE
-P 2550 1650
-F 0 "#PWR05" H 2550 1400 50  0001 C CNN
-F 1 "GND" H 2550 1500 50  0000 C CNN
-F 2 "" H 2550 1650 50  0000 C CNN
-F 3 "" H 2550 1650 50  0000 C CNN
-	1    2550 1650
+P 2250 1600
+F 0 "#PWR05" H 2250 1350 50  0001 C CNN
+F 1 "GND" H 2250 1450 50  0000 C CNN
+F 2 "" H 2250 1600 50  0000 C CNN
+F 3 "" H 2250 1600 50  0000 C CNN
+	1    2250 1600
 	1    0    0    -1  
 $EndComp
 Text GLabel 4550 3350 0    39   Input ~ 0
@@ -198,12 +198,12 @@ $EndComp
 $Comp
 L power:VCC #PWR09
 U 1 1 5894BA7B
-P 2050 1350
-F 0 "#PWR09" H 2050 1200 50  0001 C CNN
-F 1 "VCC" H 2050 1500 50  0000 C CNN
-F 2 "" H 2050 1350 50  0000 C CNN
-F 3 "" H 2050 1350 50  0000 C CNN
-	1    2050 1350
+P 1850 1150
+F 0 "#PWR09" H 1850 1000 50  0001 C CNN
+F 1 "VCC" H 1850 1300 50  0000 C CNN
+F 2 "" H 1850 1150 50  0000 C CNN
+F 3 "" H 1850 1150 50  0000 C CNN
+	1    1850 1150
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -235,17 +235,6 @@ F 3 "" H 4150 1350 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 NoConn ~ 13200 3550
-$Comp
-L Regulator_Linear:NCP1117-3.3_SOT223 U1
-U 1 1 58CDA4B0
-P 2550 1350
-F 0 "U1" H 2550 1575 50  0000 C CNN
-F 1 "NCP1117ST33T3G" H 2550 1500 50  0000 C CNN
-F 2 "Package_TO_SOT_SMD:SOT-223-3_TabPin2" H 2600 1100 50  0001 L CNN
-F 3 "" H 2550 1350 50  0001 C CNN
-	1    2550 1350
-	1    0    0    -1  
-$EndComp
 Wire Wire Line
 	4300 3150 4550 3150
 Wire Wire Line
@@ -294,11 +283,7 @@ Wire Wire Line
 	4150 1500 4150 1600
 Connection ~ 4500 1600
 Wire Wire Line
-	2050 1350 2250 1350
-Wire Wire Line
 	4150 1600 4500 1600
-Wire Wire Line
-	2850 1350 3350 1350
 Wire Wire Line
 	6000 1150 5700 1150
 Wire Wire Line
@@ -654,7 +639,7 @@ L Device:R R2
 U 1 1 5B13208F
 P 9650 5450
 F 0 "R2" V 9730 5450 50  0000 C CNN
-F 1 "100K" V 9650 5450 50  0000 C CNN
+F 1 "10k" V 9650 5450 50  0000 C CNN
 F 2 "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder" V 9580 5450 50  0001 C CNN
 F 3 "" H 9650 5450 50  0000 C CNN
 	1    9650 5450
@@ -852,4 +837,87 @@ F 7 "CUI Devices" H 8800 2500 50  0001 L BNN "MANUFACTURER"
 $EndComp
 Wire Wire Line
 	7550 1800 7550 2500
+$Comp
+L Regulator_Switching:ADP2108AUJ-3.3 U1
+U 1 1 60A54EC7
+P 2250 1300
+F 0 "U1" H 2250 1625 50  0000 C CNN
+F 1 "MCP1603T-330I/OS" H 2700 950 50  0000 C CNN
+F 2 "Package_TO_SOT_SMD:TSOT-23-5" H 2300 1050 50  0001 L CNN
+F 3 "https://www.analog.com/media/en/technical-documentation/data-sheets/ADP2108.pdf" H 2000 950 50  0001 C CNN
+F 4 "1439373" H 2250 1300 50  0001 C CNN "Farnell"
+	1    2250 1300
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:L L1
+U 1 1 60A59D6E
+P 2700 1200
+F 0 "L1" V 2890 1200 50  0000 C CNN
+F 1 "4.7u / TYS30104R7M-10" V 2600 850 50  0000 C CNN
+F 2 "Inductor_SMD:L_Taiyo-Yuden_MD-3030" H 2700 1200 50  0001 C CNN
+F 3 "~" H 2700 1200 50  0001 C CNN
+F 4 "2292502" V 2700 1200 50  0001 C CNN "Farnell"
+	1    2700 1200
+	0    -1   -1   0   
+$EndComp
+Wire Wire Line
+	2550 1400 2850 1400
+Wire Wire Line
+	2850 1400 2850 1200
+Wire Wire Line
+	2850 1200 2900 1200
+Connection ~ 2850 1200
+Wire Wire Line
+	1850 1150 1850 1200
+Wire Wire Line
+	1850 1300 1950 1300
+Wire Wire Line
+	1950 1200 1850 1200
+Connection ~ 1850 1200
+Wire Wire Line
+	1850 1200 1850 1300
+$Comp
+L power:PWR_FLAG #FLG0101
+U 1 1 60D1552F
+P 4500 1150
+F 0 "#FLG0101" H 4500 1225 50  0001 C CNN
+F 1 "PWR_FLAG" H 4500 1323 50  0000 C CNN
+F 2 "" H 4500 1150 50  0001 C CNN
+F 3 "~" H 4500 1150 50  0001 C CNN
+	1    4500 1150
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:PWR_FLAG #FLG0102
+U 1 1 60D15FCA
+P 6000 1150
+F 0 "#FLG0102" H 6000 1225 50  0001 C CNN
+F 1 "PWR_FLAG" H 6000 1323 50  0000 C CNN
+F 2 "" H 6000 1150 50  0001 C CNN
+F 3 "~" H 6000 1150 50  0001 C CNN
+	1    6000 1150
+	1    0    0    -1  
+$EndComp
+Connection ~ 6000 1150
+Wire Notes Line
+	6300 800  3800 800 
+Wire Notes Line
+	3800 800  3800 1950
+Wire Notes Line
+	3800 1950 6300 1950
+Wire Notes Line
+	6300 1950 6300 800 
+Text Notes 4300 750  0    60   ~ 0
+Capacitors for DCDC & ESP32
+Wire Notes Line
+	3700 800  1450 800 
+Wire Notes Line
+	1450 800  1450 1950
+Wire Notes Line
+	1450 1950 3700 1950
+Wire Notes Line
+	3700 1950 3700 800 
+Text Notes 2150 750  0    60   ~ 0
+DCDC converter
 $EndSCHEMATC

@@ -1,0 +1,29 @@
+EESchema-LIBRARY Version 2.3
+#encoding utf-8
+#(c) SnapEDA 2016 (snapeda.com)
+#This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA) with Design Exception 1.0
+#
+# CMM-4030D-261-I2S-TR
+#
+DEF CMM-4030D-261-I2S-TR MK 0 40 Y Y 1 L N
+F0 "MK" -500 425 50 H V L BNN
+F1 "CMM-4030D-261-I2S-TR" -501 -501 50 H V L BNN
+F2 "MIC_CMM-4030D-261-I2S-TR" 0 0 50 H I L BNN
+F3 "" 0 0 50 H I L BNN
+F4 "1.0" 0 0 50 H I L BNN "PARTREV"
+F5 "1.4 mm" 0 0 50 H I L BNN "MAXIMUM_PACKAGE_HEIGHT"
+F6 "Manufacturer Recommendations" 0 0 50 H I L BNN "STANDARD"
+F7 "CUI Devices" 0 0 50 H I L BNN "MANUFACTURER"
+DRAW
+S -500 -400 500 400 0 0 10 f
+X SD 7 700 100 200 L 40 40 0 0 O 
+X L/R 5 -700 -100 200 R 40 40 0 0 I 
+X GND 1 700 -300 200 L 40 40 0 0 W 
+X SCK 6 700 0 200 L 40 40 0 0 I C
+X VDD 8 700 300 200 L 40 40 0 0 W 
+X WS 3 700 -100 200 L 40 40 0 0 I 
+X CHIPEN 4 -700 100 200 R 40 40 0 0 I 
+ENDDRAW
+ENDDEF
+#
+# End Library

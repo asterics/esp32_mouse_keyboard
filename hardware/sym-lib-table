@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name ESP32-footprints-Shem-Lib)(type Legacy)(uri ${KIPRJMOD}/lib/ESP32-footprints-Shem-Lib.lib)(options "")(descr ""))
+  (lib (name CMM-4030D-261-I2S-TR)(type Legacy)(uri ${KIPRJMOD}/lib/CMM-4030D-261-I2S-TR.lib)(options "")(descr ""))
+)

@@ -1,0 +1,15 @@
+
+BOM for ESP32miniBT add-on module for FlipMouse
+===============================================
+
+U1:      Low-Dropout-Regulator 3,3V  (NCP1117ST33T)  Farnell 1825376
+U2:      Espressif             ESP32 (Wroom PCB)     Mouser: 356-ESP-WROOM-32  (or via ebay, aliexpress etc.)
+C1:      Capacitor             100uf (1206)          Farnell: 2852775
+C2,C4,C6,
+C7,C8:   Capacitor             100nf (0805)          Farnell: 1301805
+C3,C5:   Capacitor              10uf (0805)          Farnell: 2525145
+R1,R2,R4:Resistor               100k (0805)          Farnell: 1469860
+R3:      Resistor               330R (0805)          Farnell: 2671013
+D1:      LED 1206               yellow (1206)        Farnell: 1581231
+J1:      Socketstrip  SMD        5x2 (2,54mm)        Farnell: 2293771
+MK1:     CUI Devices             I2S (MEMS mic)      Mouser: 490-CMM4030D261I2STR

@@ -2,7 +2,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#define MODULE_ID "ESP32miniBT_v0.1"
+#define MODULE_ID "ESP32miniBT_v0.3"
 
 #if CONFIG_MODULE_FLIPMOUSE
     #define GATTS_TAG "FLipMouse"

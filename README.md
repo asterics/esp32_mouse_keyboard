@@ -40,6 +40,29 @@ With `idf.py -p (PORT) flash` or `make flash` you can upload this build to an ES
 
 With `idf.py -p (PORT) monitor` or `make monitor` you can see the debug output (please use this output if you open an issue) or trigger basic test commands (mouse movement or a keyboard key press) on
 a connected target.
+
+# Voice recognition
+
+The current PCB version includes a _CMM-4030D_ MEMS microphone. In our usecase, this microphone is used to record voice data and process it into written text.
+
+Due to the CPU limitations on the ESP32, the audio processing is done on an external device, mostly a pre-configured RaspberryPi.
+
+## Configuration
+
+The audio processor must be configured prior using voice recognition. We need following settings. Please configure the settings via the __$SV__ command, following keys are used:
+
+* __SSID__ (WiFi SSID): this is the WiFi SSID where the speech processor is reachable.
+* __PASS__ (WiFi passphrase): WiFi passphrase for this SSID
+* __SPIP__ (speech processor IP): IPv4 address of the speech processor device
+* __SPPORT__ (processor port): port number (websocket) of the speech processor software
+
+_TODO:_ add here the link to the python speech processor sourcecode
+
+## Usage
+
+1. First, the audio processing must be initialised with the _$IA_ command. The ESP32 starts up the WiFi and connects to the websocket. If successful, __$AP-success__ is sent back to the UART, __$AP-error:'error message'__ is returned otherwise.
+2. If connecting was successful, the audio processing is started with _$SA_. Now the microphone will be enabled, audio is streamed to the websocket. On recognition of a phrase, it will be returned to the UART: __$AP:'recognized text'__
+3. To disable recording, send _$EA_. If you want to re-enable it, go to step 2.
  
 # Usage via Console or second UART
 
@@ -82,6 +105,9 @@ _Note:_ We do not test these on a regular basis!
 |$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
 |$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
 |$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
+|$SA|Start audio processing|--|see "voice recognition"|
+|$EA|End audio processing|--|see "voice recognition"|
+|$IA|Init audio processing|--|see "voice recognition"|
 |$UG|Initiating firmware update|--|Boot partition is set to 'factory', if available. Device is restarted and expects firmware (.bin) via UART2|
 |$SV|Set a key/value pair |key value| Set a value to ESP32 NVS storage, e.g. "$SV testkey This is a testvalue". Note: no spaces in the key! Returns "OK xx/yy used/free" on success, NVS:"error code" otherwise.|
 |$GV|Get a key/value pair |key| Get a value from ESP32 NVS storage, e.g. "$GV testkey". Note: no spaces in the key!|

@@ -53,15 +53,14 @@ The audio processor must be configured prior using voice recognition. We need fo
 
 * __SSID__ (WiFi SSID): this is the WiFi SSID where the speech processor is reachable.
 * __PASS__ (WiFi passphrase): WiFi passphrase for this SSID
-* __SPIP__ (speech processor IP): IPv4 address of the speech processor device
-* __SPPORT__ (processor port): port number (websocket) of the speech processor software
+* __SPURI__ (speech processor URI): URI of the speech processor device (e.g.: ws://192.168.0.100:8080/recognize)
 
 _TODO:_ add here the link to the python speech processor sourcecode
 
 ## Usage
 
-1. First, the audio processing must be initialised with the _$IA_ command. The ESP32 starts up the WiFi and connects to the websocket. If successful, __$AP-success__ is sent back to the UART, __$AP-error:'error message'__ is returned otherwise.
-2. If connecting was successful, the audio processing is started with _$SA_. Now the microphone will be enabled, audio is streamed to the websocket. On recognition of a phrase, it will be returned to the UART: __$AP:'recognized text'__
+1. First, the audio processing must be initialised with the _$IA_ command. The ESP32 starts up the WiFi and connects to the websocket. If successful, __AP-success__ is sent back to the UART, __AP-error:'error message'__ is returned otherwise.
+2. If connecting was successful, the audio processing is started with _$SA_. Now the microphone will be enabled, audio is streamed to the websocket. On recognition of a phrase, it will be returned to the UART: __AP:'recognized text'__
 3. To disable recording, send _$EA_. If you want to re-enable it, go to step 2.
  
 # Usage via Console or second UART

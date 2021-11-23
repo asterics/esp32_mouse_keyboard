@@ -62,6 +62,7 @@
 #include "hid_dev.h"
 #include "config.h"
 #include "esp_ota_ops.h"
+#include "audio_streaming.h"
 
 /**
  * Brief:
@@ -505,16 +506,87 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
     // $CV clear all key/value pairs set with $SV
     // $UG start flash update by searching for factory partition and rebooting there.
+    // $IA init audio processing
+    // $SA start audio processing
+    // $EA pause/stop audio processing
 
     if(cmdBuffer->bufferLength < 2) return;
     //easier this way than typecast in each str* function
     const char *input = (const char *) cmdBuffer->buf;
     int len = cmdBuffer->bufferLength;
-    uint8_t keycode;
+    //uint8_t keycode;
     const char *nl = "\r\n";
     esp_ble_bond_dev_t * btdevlist;
     int counter;
     esp_err_t ret;
+    
+    /**++++ audio processing ++++*/
+    if(strncmp(input,"IA ", 2) == 0)
+	{
+		ret = audio_streaming_init();
+		if(ret == ESP_OK)
+		{
+			ESP_LOGI(EXT_UART_TAG,"initialized audio processing");
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "AP-success",strlen("AP-success"));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			ESP_LOGW(EXT_UART_TAG,"initialized audio processing failed: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "AP-error:",strlen("AP-error:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret),strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		}
+		return;
+	}
+    if(strncmp(input,"SA ", 2) == 0)
+	{
+		ret = audio_streaming_start();
+		if(ret == ESP_OK)
+		{
+			ESP_LOGI(EXT_UART_TAG,"started audio processing");
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "AP-OK",strlen("AP-OK"));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			ESP_LOGW(EXT_UART_TAG,"starting audio processing failed: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "AP-error:",strlen("AP-error:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret),strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		}
+		return;
+	}
+    if(strncmp(input,"EA ", 2) == 0)
+	{
+		ret = audio_streaming_stop();
+		if(ret == ESP_OK)
+		{
+			ESP_LOGI(EXT_UART_TAG,"stopped audio processing");
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "AP-OK",strlen("AP-OK"));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		} else {
+			ESP_LOGW(EXT_UART_TAG,"stopping audio processing failed: %s",esp_err_to_name(ret));
+			if(cmdBuffer->sendToUART != 0) 
+			{
+				uart_write_bytes(EX_UART_NUM, "AP-error:",strlen("AP-error:"));
+				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret),strlen(esp_err_to_name(ret)));
+				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			}
+		}
+		return;
+	}
 
 	/**++++ key/value storing ++++*/
 	if(strncmp(input,"CV ", 2) == 0)
@@ -1275,5 +1347,5 @@ void app_main(void)
     esp_timer_handle_t periodic_timer;
     esp_timer_create(&periodic_timer_args, &periodic_timer);
     //call every 100ms
-    esp_timer_start_periodic(periodic_timer, 100000);
+    //esp_timer_start_periodic(periodic_timer, 100000);
 }

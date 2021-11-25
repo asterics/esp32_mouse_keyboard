@@ -50,8 +50,8 @@
 #include <math.h>
 
 
-#define SAMPLE_RATE     (36000)
-#define I2S_DMA_SIZE	(256)
+#define SAMPLE_RATE     (16000)
+#define I2S_DMA_SIZE	(512)
 #define I2S_NUM         (0)
 #define I2S_BCK_IO      (14)
 #define I2S_WS_IO       (15)

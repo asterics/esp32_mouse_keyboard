@@ -32,7 +32,7 @@
  * 3. active: processing I2S data, sending it to the websocket and receiving STT (speech to text) data
  *
  */
- 
+
 #include "audio_streaming.h"
  
 static EventGroupHandle_t audiostreamingstatus = NULL;
@@ -57,49 +57,55 @@ nvs_handle nvs_storage_h;
 void audio_streaming_task(void *param)
 {
 	ESP_LOGI(LOG_TAG,"main I2S task started");
-    size_t read;
+    
     //samples buffer, int32 raw data. I2S_DMA_SIZE is in Bytes -> divide by size
     int32_t samples[I2S_DMA_SIZE/sizeof(int32_t)];
     //byte buffer for processed data sent to WS. is char, but stored data is int16 WAV!
-    //divided by 2, because we receive I2S stereo data altough no right microphone is attached
     //(required by CMM4030-D: always clock 64bits)
-    char txbuf[(I2S_DMA_SIZE/sizeof(int32_t))*sizeof(int16_t)/2];
+    //char txbuf[(I2S_DMA_SIZE/sizeof(int32_t))*sizeof(int16_t)/2];
+    int16_t txbuf[2048];
+    
     
 	while(1)
 	{
 		//wait until transfer is enabled
 		xEventGroupWaitBits(audiostreamingstatus,AUDIOSTREAMING_RUNNING,pdFALSE,pdFALSE,portMAX_DELAY);
 		ESP_LOGI(LOG_TAG,"main I2S task resumed");
-		i2s_start(I2S_NUM);
 		
+		i2s_start(I2S_NUM);
+
 		//if started (flag) start I2S & send to WS.
 		while(1)
 		{
-			i2s_read(I2S_NUM,samples,I2S_DMA_SIZE,&read,portMAX_DELAY);
-			//ESP_LOGI(LOG_TAG,"------------new i2s_read");
-			
-			//process I2S samples to int16_t (WAV format) & split into bytes (for WS)
-			//we got count of bytes (read), but iterate over by samples in int32_t
-			//and convert stereo to mono
-			for(int i = 0; i<(read/sizeof(int32_t)/2); i++)
+			size_t totalWords = 0;
+			//we read 32 i2s buffers (32x64samples a 16bits -> 4096 B as in txbuf)
+			for(uint16_t j = 0; j<16; j++)
 			{
-				//map to 16bit raw (original: 18 bits, >> 14)
-				txbuf[i*2] = (samples[i*2] >> 16) & 0xFF;
-				txbuf[i*2+1] = (samples[i*2]>>24) & 0xFF;
+				size_t read;
+				i2s_read(I2S_NUM,samples,I2S_DMA_SIZE,&read,portMAX_DELAY);
+			
+				//process I2S samples to int16_t (WAV format) & split into bytes (for WS)
+				//we got count of bytes (read), but iterate over by samples in int32_t
+				//and convert stereo to mono
+				//char buf[9];
+				for(int i = 0; i<(read/sizeof(int32_t)/2); i++)
+				{
+					//map to 16bit raw (original: 24 bits)
+					txbuf[totalWords] = (int16_t)(samples[i*2]>>10);
+					
+					//this variant led to clipping, above is shifted for less resolution but without clipping.
+					//txbuf[totalWords] = (int16_t)(samples[i*2]>>8);
+					totalWords++;
+				}
 			}
 			
 			//send to WS.
 			if (esp_websocket_client_is_connected(client)) {
-				esp_websocket_client_send_bin(client, txbuf, read/sizeof(int32_t)*2, portMAX_DELAY);
-				/*ESP_LOGI(LOG_TAG,"samples (read: %d):",read);
-				ESP_LOG_BUFFER_HEX(LOG_TAG,samples,read);
-				ESP_LOGI(LOG_TAG,"samples:");
-				ESP_LOGI(LOG_TAG,"txbuf:");
-				ESP_LOG_BUFFER_HEX(LOG_TAG,txbuf,(read/sizeof(int32_t))*sizeof(int16_t)/2);*/
+				esp_websocket_client_send_bin(client, txbuf, totalWords*2, portMAX_DELAY);
 			}
 			
 			//at least one tick delay to avoid watchdog reset
-			vTaskDelay(1);
+			//vTaskDelay(1);
 			//check if we should break this loop
 			if(!(xEventGroupGetBits(audiostreamingstatus) & AUDIOSTREAMING_RUNNING))
 			{
@@ -167,10 +173,10 @@ static esp_err_t init_i2s(void)
         .mode = I2S_MODE_MASTER | I2S_MODE_RX,
         .sample_rate = SAMPLE_RATE,
         .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
-        .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-        .dma_buf_count = 8,
+        .dma_buf_count = 4,
         .dma_buf_len = I2S_DMA_SIZE,
     };
 
@@ -194,7 +200,7 @@ static esp_err_t init_i2s(void)
 		ESP_LOGE(LOG_TAG, "err-init: %s",esp_err_to_name(ret));
 		return ret;
 	}
-    i2s_set_clk(I2S_NUM, SAMPLE_RATE, I2S_BITS_PER_SAMPLE_32BIT, I2S_CHANNEL_MONO);
+    i2s_set_clk(I2S_NUM, SAMPLE_RATE, I2S_BITS_PER_SAMPLE_32BIT, I2S_CHANNEL_STEREO);
     //stop I2S
 	i2s_stop(I2S_NUM);
 	return ESP_OK;
@@ -260,6 +266,20 @@ static esp_netif_t *wifi_start(void)
 esp_err_t audio_streaming_init(void)
 {
 	esp_err_t ret;
+	
+	//check if already initialized
+	if(audiostreamingstatus != NULL)
+	{
+		if(xEventGroupGetBits(audiostreamingstatus) & AUDIOSTREAMING_INITIALIZED)
+		{
+			ESP_LOGW(LOG_TAG,"Already initialized!");
+			return ESP_ERR_INVALID_STATE;
+		} else {
+			ESP_LOGE(LOG_TAG,"Cannot initialize, flags are != NULL!");
+			return ESP_FAIL;
+		}
+	}
+	
 	audiostreamingstatus = xEventGroupCreate();
 	
 	/** initialize the Wifi stack (from websocket_example.c) */
@@ -359,7 +379,7 @@ esp_err_t audio_streaming_init(void)
 	}
 	
 	//start main task
-	ret = xTaskCreate( audio_streaming_task, "I2S_WS", 4096, NULL, tskIDLE_PRIORITY, NULL);
+	ret = xTaskCreate( audio_streaming_task, "I2S_WS", 8192, NULL, tskIDLE_PRIORITY, NULL);
     
     //esp_websocket_client_is_connected(client)
     xEventGroupSetBits(audiostreamingstatus,AUDIOSTREAMING_INITIALIZED);

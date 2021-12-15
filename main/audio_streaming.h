@@ -47,6 +47,8 @@
 #include "esp_event.h"
 #include "driver/i2s.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
+#include "config.h"
 #include <math.h>
 
 

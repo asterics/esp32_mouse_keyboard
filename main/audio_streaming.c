@@ -135,8 +135,14 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
         if (data->op_code == 0x08 && data->data_len == 2) {
             ESP_LOGW(LOG_TAG, "Received closed message with code=%d", 256*data->data_ptr[0] + data->data_ptr[1]);
         } else {
-            ESP_LOGW(LOG_TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
-            //TODO: send this data to UART
+			//if we received something from the websocket (recognized words), send this with a prefix to the UART.
+			if(data->data_len > 0)
+			{
+				ESP_LOGW(LOG_TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+				uart_write_bytes(EX_UART_NUM, "AP:",strlen("AP:"));
+				uart_write_bytes(EX_UART_NUM, data->data_ptr,data->data_len);
+				uart_write_bytes(EX_UART_NUM,"\r\n",strlen("\r\n")); //newline
+			}
         }
         ESP_LOGW(LOG_TAG, "Total payload length=%d, data_len=%d, current payload offset=%d\r\n", data->payload_len, data->data_len, data->payload_offset);
 

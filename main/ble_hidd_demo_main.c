@@ -113,7 +113,6 @@ nvs_handle nvs_bt_name_h;
  * GUI on the ESP32. */
 nvs_handle nvs_storage_h;
 
-static uint16_t hid_conn_id = 0;
 static bool sec_conn = false;
 static bool send_volum_up = false;
 #define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
@@ -154,8 +153,15 @@ static config_data_t config;
 #define CMDSTATE_GET_ASCII 2
 
 //a list of active HID connections.
-//index is the hid_conn_id.
+//conn_id array stores the connection ID, if unused it is -1
+//active_connections stores the BT mac address
+int32_t active_hid_conn_ids[CONFIG_BT_ACL_CONNECTIONS] = {-1};
 esp_bd_addr_t active_connections[CONFIG_BT_ACL_CONNECTIONS] = {0};
+//this HID connection is used, if only ONE device should receive the HID data.
+//currently, the $SW command to select the HID device to be controlled it is
+//set to -1 (send to all devices). If it is != -1, we will send it to only this device.
+///@note This works only for the UART interface (uart_parse_command).
+int16_t hid_conn_id = -1;
 
 struct cmdBuf {
 	//current state of the parser, CMD_STATE*
@@ -275,7 +281,10 @@ static void periodicHIDCallback(void* arg)
 	if(abs(esp_timer_get_time()-timestampLastSent) > HID_IDLE_UPDATE_RATE)
 	{
 		//send empty report (but with last known button state)
-		esp_hidd_send_mouse_value(hid_conn_id,mouseButtons,0,0,0);
+		for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+		{
+			if(active_hid_conn_ids[i] != -1) esp_hidd_send_mouse_value(active_hid_conn_ids[i],mouseButtons,0,0,0);
+		}
 		//save timestamp for next call
 		timestampLastSent = esp_timer_get_time();
 		ESP_LOGI(HID_DEMO_TAG,"Idle...");
@@ -317,15 +326,16 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         break;
     case ESP_HIDD_EVENT_BLE_CONNECT: {
         ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
-        hid_conn_id = param->connect.conn_id;
         
-        //save currently connecting device to the list.
-        //this list is used to switch between connected devices when sending HID packets
-        if(hid_conn_id < CONFIG_BT_ACL_CONNECTIONS)
+        for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS;i++)
         {
-			memcpy(active_connections[hid_conn_id], param->connect.remote_bda, sizeof(esp_bd_addr_t));
-		} else {
-			ESP_LOGE(HID_DEMO_TAG,"Oups, hid_conn_id too high!");
+			if(active_hid_conn_ids[i] == -1) //search for the first unused slot
+			{
+				memcpy(active_connections[i], param->connect.remote_bda, sizeof(esp_bd_addr_t));
+				active_hid_conn_ids[i] = param->connect.conn_id;
+				ESP_LOGI(HID_DEMO_TAG, "Added connection: %d @ %d",active_hid_conn_ids[i],i);
+				break;
+			}
 		}
 		
 		//because some devices do connect with a quite high connection
@@ -352,18 +362,23 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
 			if(memcmp(active_connections[i],param->disconnect.remote_bda,sizeof(esp_bd_addr_t)) == 0)
 			{
 				//clear element
+				ESP_LOGI(HID_DEMO_TAG, "Removed connection: %d @ %d",active_hid_conn_ids[i],i);
 				memset(active_connections[i],0,sizeof(esp_bd_addr_t));
-				//last connection
-				if(i == 0) sec_conn = false;
-				
-				//TODO: currently we the first connection id after disconnect.
-				//maybe we should do it differently?
-				if(i != 0) hid_conn_id = 0;
+				active_hid_conn_ids[i] = -1;
 				
 				ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT: removed from array @%d",i);
 				break;
 			}
 		}
+		
+		//determine if there is at least one device connected.
+		for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+		{
+			if(active_hid_conn_ids[i] != -1) break;
+			//if not, set sec_conn to false
+			if(i == (CONFIG_BT_ACL_CONNECTIONS-1)) sec_conn = false;
+		}
+				
         ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
         esp_ble_gap_start_advertising(&hidd_adv_params);
         xEventGroupSetBits(eventgroup_system,SYSTEM_CURRENTLY_ADVERTISING);
@@ -662,7 +677,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
 		return;
 	}
-    //switch between BT devices which are connected...
+    //switch between BT devices which are connected... 
     if(input[0] == 'S' && input[1] == 'W')
     {
 		if(len >= 15)
@@ -923,7 +938,17 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                 ESP_LOGI(EXT_UART_TAG,"not connected, cannot send report");
             } else {
                 if (cmdBuffer->buf[1] == 0x00) {   // keyboard report
-                    esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+					//if hid_conn_id is set (!= -1) we send to one device only. Send to all otherwise
+					if(hid_conn_id == -1)
+					{
+						for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+						{
+							if(active_hid_conn_ids[i] != -1) esp_hidd_send_keyboard_value(active_hid_conn_ids[i],cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+						}
+					} else {
+						esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+					}
+                    
                     //update timestamp
                     timestampLastSent = esp_timer_get_time();
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
@@ -932,7 +957,15 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                     //memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
                     ///@todo esp_hidd_send_joystick_value...
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
-                    esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+					if(hid_conn_id == -1)
+					{
+						for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+						{
+							if(active_hid_conn_ids[i] != -1) esp_hidd_send_mouse_value(active_hid_conn_ids[i],cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+						}
+					} else {
+						esp_hidd_send_mouse_value(hid_conn_id,cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
+					}
                     //update timestamp
                     timestampLastSent = esp_timer_get_time();
                     //and save mouse button state
@@ -1039,7 +1072,7 @@ void uart_external_task(void *pvParameters)
 void blink_task(void *pvParameter)
 {
     // Initialize GPIO pins
-    gpio_pad_select_gpio(INDICATOR_LED_PIN);
+    //gpio_pad_select_gpio(INDICATOR_LED_PIN);
     gpio_set_direction(INDICATOR_LED_PIN, GPIO_MODE_OUTPUT);
     int blinkTime;
 
@@ -1092,50 +1125,98 @@ void uart_console_task(void *pvParameters)
         } else {
             switch (character) {
 			case 'm':
-				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_MUTE,true);
-				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_MUTE,false);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_consumer_value(active_hid_conn_ids[i],HID_CONSUMER_MUTE,true);
+						esp_hidd_send_consumer_value(active_hid_conn_ids[i],HID_CONSUMER_MUTE,false);
+					}
+				}
 				ESP_LOGI(CONSOLE_UART_TAG,"consumer: mute");
 				break;
 			case 'p':
-				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_UP,true);
-				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_UP,false);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_consumer_value(active_hid_conn_ids[i],HID_CONSUMER_VOLUME_UP,true);
+						esp_hidd_send_consumer_value(active_hid_conn_ids[i],HID_CONSUMER_VOLUME_UP,false);
+					}
+				}
 				ESP_LOGI(CONSOLE_UART_TAG,"consumer: volume plus");
 				break;
 			case 'o':
-				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_DOWN,true);
-				esp_hidd_send_consumer_value(hid_conn_id,HID_CONSUMER_VOLUME_DOWN,false);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_consumer_value(active_hid_conn_ids[i],HID_CONSUMER_VOLUME_DOWN,true);
+						esp_hidd_send_consumer_value(active_hid_conn_ids[i],HID_CONSUMER_VOLUME_DOWN,false);
+					}
+				}
 				ESP_LOGI(CONSOLE_UART_TAG,"consumer: volume minus");
 				break;
             case 'a':
-                esp_hidd_send_mouse_value(hid_conn_id,0,-MOUSE_SPEED,0,0);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1) esp_hidd_send_mouse_value(active_hid_conn_ids[i],0,-MOUSE_SPEED,0,0);
+				}
                 ESP_LOGI(CONSOLE_UART_TAG,"mouse: a");
                 break;
             case 's':
-                esp_hidd_send_mouse_value(hid_conn_id,0,0,MOUSE_SPEED,0);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1) esp_hidd_send_mouse_value(active_hid_conn_ids[i],0,0,MOUSE_SPEED,0);
+				}
                 ESP_LOGI(CONSOLE_UART_TAG,"mouse: s");
                 break;
             case 'd':
-                esp_hidd_send_mouse_value(hid_conn_id,0,MOUSE_SPEED,0,0);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1) esp_hidd_send_mouse_value(active_hid_conn_ids[i],0,MOUSE_SPEED,0,0);
+				}
                 ESP_LOGI(CONSOLE_UART_TAG,"mouse: d");
                 break;
             case 'w':
-                esp_hidd_send_mouse_value(hid_conn_id,0,0,-MOUSE_SPEED,0);
+                for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1) esp_hidd_send_mouse_value(active_hid_conn_ids[i],0,0,-MOUSE_SPEED,0);
+				}
                 ESP_LOGI(CONSOLE_UART_TAG,"mouse: w");
                 break;
             case 'l':
-                esp_hidd_send_mouse_value(hid_conn_id,(1<<0),0,0,0);
-                esp_hidd_send_mouse_value(hid_conn_id,0,0,0,0);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_mouse_value(active_hid_conn_ids[i],(1<<0),0,0,0);
+						esp_hidd_send_mouse_value(active_hid_conn_ids[i],0,0,0,0);
+					}
+				}
                 break;
             case 'r':
-                esp_hidd_send_mouse_value(hid_conn_id,(1<<1),0,0,0);
-                esp_hidd_send_mouse_value(hid_conn_id,0,0,0,0);
+	            for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_mouse_value(active_hid_conn_ids[i],(1<<1),0,0,0);
+						esp_hidd_send_mouse_value(active_hid_conn_ids[i],0,0,0,0);
+					}
+				}
                 ESP_LOGI(CONSOLE_UART_TAG,"mouse: r");
                 break;
             case 'q':
-                kbdcmd[0] = 28;
-                esp_hidd_send_keyboard_value(hid_conn_id,0,kbdcmd,1);
-                kbdcmd[0] = 0;
-                esp_hidd_send_keyboard_value(hid_conn_id,0,kbdcmd,1);
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						kbdcmd[0] = 28;
+						esp_hidd_send_keyboard_value(active_hid_conn_ids[i],0,kbdcmd,1);
+						kbdcmd[0] = 0;
+						esp_hidd_send_keyboard_value(active_hid_conn_ids[i],0,kbdcmd,1);
+					}
+				}
                 ESP_LOGI(CONSOLE_UART_TAG,"received q: sending key y (z for QWERTZ) for test purposes");
                 break;
             default:

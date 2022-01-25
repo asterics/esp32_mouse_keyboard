@@ -1126,6 +1126,7 @@ void uart_console_task(void *pvParameters)
         if(hid_or_command == 1)
         {
             uart_parse_command(character,&commands);
+            if(commands.state == CMDSTATE_IDLE) hid_or_command = 0;
             continue;
         }
 

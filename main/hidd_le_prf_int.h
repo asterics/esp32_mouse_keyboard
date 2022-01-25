@@ -27,6 +27,8 @@
 //HID BLE profile log tag
 #define HID_LE_PRF_TAG                        "HID_LE_PRF"
 
+#define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
+
 /// Maximal number of HIDS that can be added in the DB
 #ifndef USE_ONE_HIDS_INSTANCE
 #define HIDD_LE_NB_HIDS_INST_MAX              (2)

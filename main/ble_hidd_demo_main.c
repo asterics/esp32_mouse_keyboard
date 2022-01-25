@@ -113,11 +113,6 @@ nvs_handle nvs_bt_name_h;
  * GUI on the ESP32. */
 nvs_handle nvs_storage_h;
 
-static bool sec_conn = false;
-static bool send_volum_up = false;
-#define CHAR_DECLARATION_SIZE   (sizeof(uint8_t))
-
-
 /** Timestamp of last sent HID packet, used for idle sending timer callback 
  * @see periodicHIDCallback */
 uint64_t timestampLastSent;
@@ -155,7 +150,7 @@ static config_data_t config;
 //a list of active HID connections.
 //conn_id array stores the connection ID, if unused it is -1
 //active_connections stores the BT mac address
-int32_t active_hid_conn_ids[CONFIG_BT_ACL_CONNECTIONS] = {-1};
+int16_t active_hid_conn_ids[CONFIG_BT_ACL_CONNECTIONS];
 esp_bd_addr_t active_connections[CONFIG_BT_ACL_CONNECTIONS] = {0};
 //this HID connection is used, if only ONE device should receive the HID data.
 //currently, the $SW command to select the HID device to be controlled it is
@@ -291,6 +286,30 @@ static void periodicHIDCallback(void* arg)
 	}
 }
 
+/**
+ * Determine if there is at least one device connected.
+ */
+bool isConnected()
+{
+	//determine if there is at least one device connected.
+	for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+	{
+		if(active_hid_conn_ids[i] != -1) return true;
+	}
+	return false;
+}
+
+void printConnectedDevicesTable()
+{
+	for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+	{
+		ESP_LOGI(HID_DEMO_TAG, "%d: HID connection ID: %d",i,active_hid_conn_ids[i]);
+		ESP_LOGI(HID_DEMO_TAG, "%d: remote BD_ADDR: %08x%04x",i,
+		 (active_connections[i][0] << 24) + (active_connections[i][1] << 16) + (active_connections[i][2] << 8) + active_connections[i][3],
+		 (active_connections[i][4] << 8) + active_connections[i][5]);
+	 }
+}
+
 
 void update_config()
 {
@@ -365,18 +384,8 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
 				ESP_LOGI(HID_DEMO_TAG, "Removed connection: %d @ %d",active_hid_conn_ids[i],i);
 				memset(active_connections[i],0,sizeof(esp_bd_addr_t));
 				active_hid_conn_ids[i] = -1;
-				
-				ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT: removed from array @%d",i);
 				break;
 			}
-		}
-		
-		//determine if there is at least one device connected.
-		for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
-		{
-			if(active_hid_conn_ids[i] != -1) break;
-			//if not, set sec_conn to false
-			if(i == (CONFIG_BT_ACL_CONNECTIONS-1)) sec_conn = false;
 		}
 				
         ESP_LOGI(HID_DEMO_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
@@ -428,7 +437,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
         break;
     case ESP_GAP_BLE_AUTH_CMPL_EVT:
-        sec_conn = true;
+		{
         esp_bd_addr_t bd_addr;
         memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
         ESP_LOGI(HID_DEMO_TAG, "remote BD_ADDR: %08x%04x",\
@@ -454,6 +463,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
             ESP_LOGW(HID_DEMO_TAG,"cannot add device to whitelist, with random address");
         }
 #endif
+		}
         break;
     //handle scan responses here...    
 	case ESP_GAP_BLE_SCAN_RESULT_EVT: {
@@ -934,7 +944,7 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
         cmdBuffer->bufferLength++;
         cmdBuffer->expectedBytes--;
         if (!cmdBuffer->expectedBytes) {
-            if(sec_conn == false) {
+            if(!isConnected()) {
                 ESP_LOGI(EXT_UART_TAG,"not connected, cannot send report");
             } else {
                 if (cmdBuffer->buf[1] == 0x00) {   // keyboard report
@@ -1077,8 +1087,8 @@ void blink_task(void *pvParameter)
     int blinkTime;
 
     while(1) {
-
-        if (sec_conn) blinkTime=1000;
+		
+        if (isConnected()) blinkTime=1000;
         else blinkTime=250;
 
         /* Blink off (output low) */
@@ -1120,7 +1130,7 @@ void uart_console_task(void *pvParameters)
         }
 
         //if not in command mode, issue HID test commands.
-        if(sec_conn == false) {
+        if(!isConnected()) {
             ESP_LOGI(CONSOLE_UART_TAG,"Not connected, ignoring '%c'", character);
         } else {
             switch (character) {
@@ -1319,7 +1329,13 @@ void app_main(void)
     } else ESP_LOGI("MAIN","locale code is : %d",config.locale);
     nvs_close(my_handle);
     ///@todo How to handle the locale here? We have the memory for full lookups on the ESP32, but how to communicate this with the Teensy?
-
+    
+    ///clear the HID connection IDs&MACs
+    for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS;i++)
+    {
+		active_hid_conn_ids[i] = -1;
+		memset(active_connections[i],0,sizeof(esp_bd_addr_t));
+	}
     ///register the callback function to the gap module
     esp_ble_gap_register_callback(gap_event_handler);
     esp_hidd_register_callbacks(hidd_event_callback);

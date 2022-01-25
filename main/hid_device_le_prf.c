@@ -588,7 +588,7 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         }
         case ESP_GATTS_DISCONNECT_EVT: {
 			 esp_hidd_cb_param_t cb_param = {0};
-			 memcpy(cb_param.disconnect.remote_bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+			 memcpy(cb_param.disconnect.remote_bda, param->disconnect.remote_bda, sizeof(esp_bd_addr_t));
 			 if(hidd_le_env.hidd_cb != NULL) {
                     (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_DISCONNECT, &cb_param);
              }

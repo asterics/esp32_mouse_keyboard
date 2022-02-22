@@ -79,7 +79,7 @@ _Note:_ We do not test these on a regular basis!
 |$GP|Get BLE pairings|--|Prints out all paired devices' MAC adress. The order is used for DP as well, starting with 0|
 |$GC|Get active BLE connections|--|Prints out connected paired devices' MAC adress. Ordered by connection occurance (first connected device is listed first)|
 |$SW|Switch between devices|BT addr (001122334455)|Switch between connected devices, the given BT addr will receive the HID packets|
-|$DP|Delete one pairing|number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP|
+|$DP|Delete one pairing (or all) |number of pairing, given as ASCII-characer '0'-'9'|Deletes one pairing. The pairing number is determined by the command GP. If no parameter is given, all pairings are removed!|
 |$PM|Set pairing mode|'0' / '1'|Enables (1) or disables (0) discovery/advertising and terminates an exisiting connection if enabled|
 |$NAME|Set BLE device name|name as ASCII string|Set the device name to the given name. Restart required.|
 |$UG|Initiating firmware update|--|Boot partition is set to 'factory', if available. Device is restarted and expects firmware (.bin) via UART2|

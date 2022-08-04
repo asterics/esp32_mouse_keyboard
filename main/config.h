@@ -2,7 +2,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#define MODULE_ID "ESP32miniBT_v0.3.2"
+#define MODULE_ID "ESP32miniBT_v0.3.3"
 
 #if CONFIG_USE_AS_FLIPMOUSE_FABI
 	#define EX_SERIAL_RXPIN      GPIO_NUM_17

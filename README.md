@@ -40,6 +40,16 @@ With `idf.py -p (PORT) flash` or `make flash` you can upload this build to an ES
 
 With `idf.py -p (PORT) monitor` or `make monitor` you can see the debug output (please use this output if you open an issue) or trigger basic test commands (mouse movement or a keyboard key press) on
 a connected target.
+
+### esp32miniBT vs. Arduino Nano Connect
+
+This firmware is used on 2 different devices in context of our assistive devices:
+* __esp32miniBT module__: This board is located in this repository and is used as addon for v2 FLipMouse, FABI and FLipPad PCBs which use either a TeensyLC or a ProMicro controller.
+* __Arduino Nano RP2040 Connect__: Version 3 of FLipMouse and FLipPad (maybe FABI as well) use this Arduino board, where we have a RP2040 controller AND the ESP32 on the same board (more RAM, more flash, cheaper than 2 boards).
+
+__Note:__ Please select the correct type of board in `idf.py menuconfig`!
+
+__Note:__ If you want to use this firmware on a custom board, you can select the external UART interface settings in menuconfig; for our boards the pinning, baudrate and UART config is pre-defined.
  
 # Usage via Console or second UART
 

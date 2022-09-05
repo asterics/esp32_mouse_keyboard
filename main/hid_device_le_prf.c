@@ -139,7 +139,7 @@ static const uint8_t hidReportMap[] = {
     0x81, 0x00,   //     Input (Data, Ary, Abs)
     0xC0,           //   End Collection
     0x81, 0x03,   //   Input (Const, Var, Abs)
-    0xC0,            // End Collectionq
+    0xC0,            // End Collection
     
     
     0x05, 0x01,  // Usage Page (Generic Desktop)
@@ -171,18 +171,47 @@ static const uint8_t hidReportMap[] = {
     0xC0,        //   End Collection
     0xC0,        // End Collection
 
-#if (SUPPORT_REPORT_VENDOR == true)
-    0x06, 0xFF, 0xFF, // Usage Page(Vendor defined)
-    0x09, 0xA5,       // Usage(Vendor Defined)
-    0xA1, 0x01,       // Collection(Application)
-    0x85, 0x04,   // Report Id (4)
-    0x09, 0xA6,   // Usage(Vendor defined)
-    0x09, 0xA9,   // Usage(Vendor defined)
-    0x75, 0x08,   // Report Size
-    0x95, 0x7F,   // Report Count = 127 Btyes
-    0x91, 0x02,   // Output(Data, Variable, Absolute)
-    0xC0,         // End Collection
-#endif
+    #if CONFIG_MODULE_USEJOYSTICK
+    0x05, 0x01,  // Usage Page (Generic Desktop)
+    0x09, 0x05,  // Usage (Gamepad)
+    0xA1, 0x01,  // Collection (Application)
+    0x85, 0x04,  // Report Id (4)
+    /* 8 bit X, Y, Z, Rz, Rx, Ry (min -127, max 127 ) */ 
+    /* implemented like Gamepad from tinyUSB */
+      0x05, 0x01,  // Usage Page (Generic Desktop)
+      0x09, 0x30,  // Usage (desktop X)
+      0x09, 0x31,  // Usage (desktop Y)
+      0x09, 0x32,  // Usage (desktop Z)
+      0x09, 0x35,  // Usage (desktop RZ)
+      0x09, 0x33,  // Usage (desktop RX)
+      0x09, 0x34,  // Usage (desktop RY)
+      0x15, 0x81,  // Logical Minimum (-127)
+      0x25, 0x7F,  // Logical Maximum (127)
+      0x95, 0x06,  // Report Count (6)
+      0x75, 0x08,  // Report Size (8)
+      0x81, 0x02,  // Input: (Data, Variable, Absolute)
+    /* 8 bit DPad/Hat Button Map  */
+      0x05, 0x01,  // Usage Page (Generic Desktop)
+      0x09, 0x39,  // Usage (hat switch)
+      0x15, 0x01,   //     Logical Min (1)
+      0x25, 0x08,   //     Logical Max (8)
+      
+      0x35, 0x00,   // Physical minimum (0)
+      0x46, 0x00,   // Physical maximum (315, size 2)
+      0x95, 0x06,  // Report Count (1)
+      0x75, 0x08,  // Report Size (8)
+      0x81, 0x02,  // Input: (Data, Variable, Absolute)
+    /* 16 bit Button Map */
+      0x05, 0x09,  // Usage Page (button)
+      0x19, 0x01,  //     Usage Minimum (01) - Button 1
+      0x29, 0x20,  //     Usage Maximum (32) - Button 2
+      0x15, 0x00,   //     Logical Min (0)
+      0x25, 0x01,   //     Logical Max (1)
+      0x95, 0x20,  // Report Count (32)
+      0x75, 0x01,  // Report Size (1)
+      0x81, 0x02,  // Input: (Data, Variable, Absolute)
+    0xC0,            // End Collection
+    #endif
 
 };
 
@@ -243,12 +272,6 @@ static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
 // HID Report Reference characteristic descriptor, LED output
 static uint8_t hidReportRefLedOut[HID_REPORT_REF_LEN] =
              { HID_RPT_ID_LED_OUT, HID_REPORT_TYPE_OUTPUT };
-
-#if (SUPPORT_REPORT_VENDOR  == true)
-
-static uint8_t hidReportRefVendorOut[HID_REPORT_REF_LEN] =
-             {HID_RPT_ID_VENDOR_OUT, HID_REPORT_TYPE_OUTPUT};
-#endif
 
 // HID Report Reference characteristic descriptor, Feature
 static uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] =
@@ -446,21 +469,6 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                        ESP_GATT_PERM_READ,
                                                                        sizeof(hidReportRefMouseIn), sizeof(hidReportRefMouseIn),
                                                                        hidReportRefMouseIn}},
-#if (SUPPORT_REPORT_VENDOR  == true)
-    // Report Characteristic Declaration
-    [HIDD_LE_IDX_REPORT_VENDOR_OUT_CHAR]        = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
-                                                                         ESP_GATT_PERM_READ,
-                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
-                                                                         (uint8_t *)&char_prop_read_write_notify}},
-    [HIDD_LE_IDX_REPORT_VENDOR_OUT_VAL]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
-                                                                       ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE,
-                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
-                                                                       NULL}},
-    [HIDD_LE_IDX_REPORT_VENDOR_OUT_REP_REF]     = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
-                                                                       ESP_GATT_PERM_READ,
-                                                                       sizeof(hidReportRefVendorOut), sizeof(hidReportRefVendorOut),
-                                                                       hidReportRefVendorOut}},
-#endif
     // Report Characteristic Declaration
     [HIDD_LE_IDX_REPORT_CC_IN_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
                                                                          ESP_GATT_PERM_READ,
@@ -607,16 +615,6 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 cb_param.vendor_write.data = param->write.value;
                 (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_LED_OUT_WRITE_EVT, &cb_param);
             }
-#if (SUPPORT_REPORT_VENDOR == true)
-            if (param->write.handle == hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_VENDOR_OUT_VAL] &&
-                hidd_le_env.hidd_cb != NULL) {;
-                cb_param.vendor_write.conn_id = param->write.conn_id;
-                cb_param.vendor_write.report_id = HID_RPT_ID_VENDOR_OUT;
-                cb_param.vendor_write.length = param->write.len;
-                cb_param.vendor_write.data = param->write.value;
-                (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT, &cb_param);
-            }
-#endif
             break;
         }
         case ESP_GATTS_CREAT_ATTR_TAB_EVT: {

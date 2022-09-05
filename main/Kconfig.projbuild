@@ -21,14 +21,14 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 		range 1 2
 		
 	config MODULE_USEKEYBOARD
-		bool "Enable BLE-HID keyboard (UNUSED)"
+		bool "Enable BLE-HID keyboard (UNUSED, mouse is always enabled)"
 		default y
 		help
 			Enable the Keyboard interface for Bluetooth.
 			
 	config MODULE_USEMOUSE
 		depends on MODULE_USEKEYBOARD
-		bool "Enable BLE-HID mouse (UNUSED)"
+		bool "Enable BLE-HID mouse (UNUSED, kbd is always enabled)"
 		default y
 		help
 			Enable the Mouse interface for Bluetooth.
@@ -44,8 +44,8 @@ menu "esp32_mouse_keyboard - FLipMouse & FABI config"
 			
 	config MODULE_USEJOYSTICK
 		depends on MODULE_USEMOUSE
-		bool "Enable BLE-HID joystick (UNUSED)"
-		default n
+		bool "Enable BLE-HID joystick"
+		default y
 		help
 			Enable the Joystick interface for Bluetooth.
 			

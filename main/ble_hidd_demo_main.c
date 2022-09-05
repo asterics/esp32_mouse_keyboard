@@ -73,10 +73,9 @@
 
 /**
  * Note:
- * 1. Win10 does not support vendor report , So SUPPORT_REPORT_VENDOR is always set to FALSE, it defines in hidd_le_prf_int.h
- * 2. Update connection parameters are not allowed during iPhone HID encryption, slave turns
+ * 1. Update connection parameters are not allowed during iPhone HID encryption, slave turns
  * off the ability to automatically update connection parameters during encryption.
- * 3. After our HID device is connected, the iPhones write 1 to the Report Characteristic Configuration Descriptor,
+ * 2. After our HID device is connected, the iPhones write 1 to the Report Characteristic Configuration Descriptor,
  * even if the HID encryption is not completed. This should actually be written 1 after the HID encryption is completed.
  * we modify the permissions of the Report Characteristic Configuration Descriptor to `ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE_ENCRYPTED`.
  * if you got `GATT_INSUF_ENCRYPTION` error, please ignore.

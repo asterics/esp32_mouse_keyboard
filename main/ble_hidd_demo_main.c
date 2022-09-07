@@ -935,9 +935,9 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
 
     case CMDSTATE_GET_RAW:
         cmdBuffer->buf[cmdBuffer->bufferLength]=character;
-        if ((cmdBuffer->bufferLength == 1) && (character==0x01)) { // we have a joystick report: increase by 4 bytes
-            cmdBuffer->expectedBytes += 6;
-            //ESP_LOGI(EXT_UART_TAG,"expecting 4 more bytes for joystick");
+        if ((cmdBuffer->bufferLength == 1) && (character==0x01)) { // we have a joystick report: increase by 5 bytes
+            cmdBuffer->expectedBytes += 5;
+            //ESP_LOGI(EXT_UART_TAG,"expecting 5 more bytes for joystick");
         }
 
         cmdBuffer->bufferLength++;
@@ -962,9 +962,13 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                     timestampLastSent = esp_timer_get_time();
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
                     //ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-                    //uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
-                    //memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
-                    ///@todo esp_hidd_send_joystick_value...
+                    uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
+                    memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
+                    //send joystick report
+                    for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+                    {
+                      if(active_hid_conn_ids[i] != -1) esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
+                    }
                 } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
 					if(hid_conn_id == -1)
 					{

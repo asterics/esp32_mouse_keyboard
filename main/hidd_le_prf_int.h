@@ -46,9 +46,9 @@
 
 // HID Report IDs for the service
 #define HID_RPT_ID_KEY_IN        1   // Keyboard input report ID
-#define HID_RPT_ID_CC_IN         2   //Consumer Control input report ID
+#define HID_RPT_ID_CC_IN         2   // Consumer Control input report ID
 #define HID_RPT_ID_MOUSE_IN      3   // Mouse input report ID
-#define HID_RPT_ID_VENDOR_OUT    4   // Vendor output report ID
+#define HID_RPT_ID_JOY_IN        4   // Joystick input report ID
 #define HID_RPT_ID_LED_OUT       1  // LED output report ID
 #define HID_RPT_ID_FEATURE       0  // Feature report ID
 

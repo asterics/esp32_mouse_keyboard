@@ -165,11 +165,65 @@ esp_err_t esp_hidd_profile_deinit(void);
  */
 uint16_t esp_hidd_get_version(void);
 
+/**
+ *
+ * @brief           Send consumer keys.
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           key_cmd Type of consumer key, use defines like HID_CONSUMER_xx (e.g. HID_CONSUMER_MUTE)
+ * @param           key_pressed True / False if key should be pressed or not.
+ *
+ */
 void esp_hidd_send_consumer_value(uint16_t conn_id, uint8_t key_cmd, bool key_pressed);
 
+/**
+ *
+ * @brief           Send a keyboard report.
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           special_key_mask  All special keys (Alt / Shift / CTRL) in one byte
+ * @param           keyboard_cmd  Array of keycodes to be sent
+ * @param           num_key Count of keycodes in keyboard_cmd which should be sent.
+ *
+ */
 void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask, uint8_t *keyboard_cmd, uint8_t num_key);
 
+/**
+ *
+ * @brief           Send a Mouse report.
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           mouse_button  Mouse button values, 1 is pressed, 0 is released. bit 0: left, bit 1: right, bit 2: middle button
+ * @param           mickeys_x  relative X axis movement
+ * @param           mickeys_y  relative Y axis movement
+ * @param           wheel  relative mouse wheel movement
+ */
 void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y, int8_t wheel);
+
+
+#if CONFIG_MODULE_USEJOYSTICK
+/**
+ *
+ * @brief           Send a Joystick report, set individual axis
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           x,y,z,rz,rx,ry  Individual gamepad axis
+ * @param           hat Hat switch status. Send 0 for rest/middleposition; 1-8 to for a direction.
+ * @param           buttons Button bitmap, button 0 is bit 0 and so on.
+ */
+void esp_hidd_send_joy_value(uint16_t conn_id, int8_t x, int8_t y, int8_t z, int8_t rz, int8_t rx, int8_t ry, uint8_t hat, uint32_t buttons);
+
+/**
+ *
+ * @brief           Send a Joystick report, use a byte array
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           report  Pointer to a 11 Byte sized array which contains the full joystick/gamepad report
+ * @warning         This function reads 11 Bytes and sends them without checks.
+ */
+void esp_hidd_send_joy_report(uint16_t conn_id, uint8_t *report);
+
+#endif
 
 #ifdef __cplusplus
 }

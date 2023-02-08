@@ -14,7 +14,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
  *
- *
+ * Copyright 2023:
+ * Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>
+ * 
  * Copyright 2020-2021:
  * Benjamin Aigner <beni@asterics-foundation.org>,<aignerb@technikum-wien.at>, 
  * Junaid Khan <junaid.khan.wien@gmail.com>
@@ -62,6 +64,7 @@
 #include "hid_dev.h"
 #include "config.h"
 #include "esp_ota_ops.h"
+#include "esp_flash.h"
 
 /**
  * Brief:
@@ -124,6 +127,32 @@ uint64_t timestampLastSent;
  * the mousebuttons must be the same
  * @see periodicHIDCallback */
 uint8_t mouseButtons = 0;
+
+/** Flag for hardware which this firmware is running on.
+ * If we are running this software on the Arudino RP2040 connect,
+ * we need to use different pins, also another UART (including pins).
+ * This flag is set immediately after startup in app_main and is set
+ * based on the flash size. All modules we used were with >=4MB flash,
+ * the uBlox NINA module on the Arduino RP2040 connect uses 2MB. */
+bool onArduinoRP2040 = false;
+
+/** 2nd UART unit number for RX/TX of commands
+ * Previously we used a define via KConfig to set the UART number.
+ * Because we need to detect on the fly if we are on an Arduino RP2040 Connect
+ * or on a Bluetooth addon, this value is set in a variable now. */
+int ext_uart_num = 0;
+
+/** 2nd UART unit RX pin */
+int ext_uart_rx = -1;
+
+/** 2nd UART unit TX pin */
+int ext_uart_tx = -1;
+
+/** pin number for indicator LED
+ * Was also a KConfig define for all available builds, now it is fixed
+ * for FABI/FM/FP builds depending on Arduino or addon board.
+ * For other modules or custom builds, it can be defined via idf.py menuconfig. */
+int indicator_led = -1;
 
 /** "Keepalive" rate when in idle (no HID commands)
  * @note Microseconds!
@@ -273,7 +302,7 @@ int get_int(const char * input, int index, int * value)
 /** Periodic sending of empty HID reports if no updates are sent via API */
 static void periodicHIDCallback(void* arg)
 {
-	if(abs(esp_timer_get_time()-timestampLastSent) > HID_IDLE_UPDATE_RATE)
+	if((esp_timer_get_time()-timestampLastSent) > HID_IDLE_UPDATE_RATE)
 	{
 		//send empty report (but with last known button state)
 		for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
@@ -548,8 +577,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		esp_log_level_set("*",ESP_LOG_ERROR);
 		if(cmdBuffer->sendToUART != 0) 
 		{
-			uart_write_bytes(EX_UART_NUM, "LOG:0",strlen("LOG:0"));
-			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			uart_write_bytes(ext_uart_num, "LOG:0",strlen("LOG:0"));
+			uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 		}
 		return;
 	}
@@ -558,8 +587,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		esp_log_level_set("*",ESP_LOG_INFO);
 		if(cmdBuffer->sendToUART != 0) 
 		{
-			uart_write_bytes(EX_UART_NUM, "LOG:1",strlen("LOG:1"));
-			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			uart_write_bytes(ext_uart_num, "LOG:1",strlen("LOG:1"));
+			uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 		}
 		return;
 	}
@@ -568,8 +597,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		esp_log_level_set("*",ESP_LOG_DEBUG);
 		if(cmdBuffer->sendToUART != 0) 
 		{
-			uart_write_bytes(EX_UART_NUM, "LOG:2",strlen("LOG:2"));
-			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			uart_write_bytes(ext_uart_num, "LOG:2",strlen("LOG:2"));
+			uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 		}
 		return;
 	}
@@ -586,8 +615,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
 		ESP_LOGI(EXT_UART_TAG,"cleared all NVS key/value pairs");
 		if(cmdBuffer->sendToUART != 0) 
 		{
-			uart_write_bytes(EX_UART_NUM, "NVS:OK",strlen("NVS:OK"));
-			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			uart_write_bytes(ext_uart_num, "NVS:OK",strlen("NVS:OK"));
+			uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 		}
 		return;
 	}
@@ -619,15 +648,15 @@ void processCommand(struct cmdBuf *cmdBuffer)
 			ESP_LOGI(EXT_UART_TAG,"error reading value: %s",esp_err_to_name(ret));
 			if(cmdBuffer->sendToUART != 0) 
 			{
-				uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
-				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
-				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+				uart_write_bytes(ext_uart_num, "NVS:",strlen("NVS:"));
+				uart_write_bytes(ext_uart_num, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
+				uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 			}
 		} else {
 			ESP_LOGI(EXT_UART_TAG,"loaded - %s:%s",key,nvspayload);
-			uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
-			uart_write_bytes(EX_UART_NUM, nvspayload, strlen(nvspayload));
-			uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+			uart_write_bytes(ext_uart_num, "NVS:",strlen("NVS:"));
+			uart_write_bytes(ext_uart_num, nvspayload, strlen(nvspayload));
+			uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 		}
 		
 		//done with the payload
@@ -650,8 +679,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
 			ESP_LOGI(EXT_UART_TAG,"error setting string: no value provided");
 			if(cmdBuffer->sendToUART != 0) 
 			{
-				uart_write_bytes(EX_UART_NUM, "NVS:ESP_ERR_NVS_NO_VALUE",strlen("NVS:ESP_ERR_NVS_NO_VALUE"));
-				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+				uart_write_bytes(ext_uart_num, "NVS:ESP_ERR_NVS_NO_VALUE",strlen("NVS:ESP_ERR_NVS_NO_VALUE"));
+				uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 			}
 			return;
 		}
@@ -671,9 +700,9 @@ void processCommand(struct cmdBuf *cmdBuffer)
 			ESP_LOGI(EXT_UART_TAG,"error setting string: %s",esp_err_to_name(ret));
 			if(cmdBuffer->sendToUART != 0) 
 			{
-				uart_write_bytes(EX_UART_NUM, "NVS:",strlen("NVS:"));
-				uart_write_bytes(EX_UART_NUM, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
-				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+				uart_write_bytes(ext_uart_num, "NVS:",strlen("NVS:"));
+				uart_write_bytes(ext_uart_num, esp_err_to_name(ret), strlen(esp_err_to_name(ret)));
+				uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 			}
 		} else {
 			//send back OK & used/free entries
@@ -682,11 +711,11 @@ void processCommand(struct cmdBuf *cmdBuffer)
 			ESP_LOGI(EXT_UART_TAG,"set - %s:%s - used:%d,free:%d",key,nvspayload,nvs_stats.used_entries, nvs_stats.free_entries);
 			if(cmdBuffer->sendToUART != 0) 
 			{
-				uart_write_bytes(EX_UART_NUM, "NVS:OK ", strlen("NVS:OK "));
+				uart_write_bytes(ext_uart_num, "NVS:OK ", strlen("NVS:OK "));
 				char stats[64];
 				sprintf(stats,"%d/%d - used/free",nvs_stats.used_entries, nvs_stats.free_entries);
-				uart_write_bytes(EX_UART_NUM,stats,strnlen(stats,64));
-				uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+				uart_write_bytes(ext_uart_num,stats,strnlen(stats,64));
+				uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 			}
 		}
 		return;
@@ -707,13 +736,13 @@ void processCommand(struct cmdBuf *cmdBuffer)
 			if(memcmp(active_connections[i],empty,sizeof(esp_bd_addr_t)) != 0)
 			{
 				//print on monitor & external uart
-				if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, "CONNECTED:",strlen("CONNECTED:"));
+				if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, "CONNECTED:",strlen("CONNECTED:"));
 				esp_log_buffer_hex(EXT_UART_TAG, active_connections[i], sizeof(esp_bd_addr_t));
 				for (int t=0; t<sizeof(esp_bd_addr_t); t++) {
 					sprintf(hexnum,"%02X ",active_connections[i][t]);
-					if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
+					if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, hexnum, 3);
 				}
-				if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+				if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
 			}
 		}
 		ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
@@ -759,8 +788,8 @@ void processCommand(struct cmdBuf *cmdBuffer)
     {
 		if(cmdBuffer->sendToUART != 0)
 		{
-			uart_write_bytes(EX_UART_NUM, MODULE_ID, sizeof(MODULE_ID));
-			uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+			uart_write_bytes(ext_uart_num, MODULE_ID, sizeof(MODULE_ID));
+			uart_write_bytes(ext_uart_num, nl, sizeof(nl));
 		}
 		ESP_LOGI(EXT_UART_TAG,"ID: %s",MODULE_ID);
         return;
@@ -819,11 +848,11 @@ void processCommand(struct cmdBuf *cmdBuffer)
                     for(uint8_t i = 0; i<counter; i++)
                     {
                         //print on monitor & external uart
-                        if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, "PAIRING:",strlen("PAIRING:"));
+                        if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, "PAIRING:",strlen("PAIRING:"));
                         esp_log_buffer_hex(EXT_UART_TAG, btdevlist[i].bd_addr, sizeof(esp_bd_addr_t));
                         for (int t=0; t<sizeof(esp_bd_addr_t); t++) {
                             sprintf(hexnum,"%02X ",btdevlist[i].bd_addr[t]);
-                            if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
+                            if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, hexnum, 3);
                         }
                         //print out name
                         char btname[64];
@@ -835,19 +864,19 @@ void processCommand(struct cmdBuf *cmdBuffer)
                         if(nvs_get_str(nvs_bt_name_h,key,btname,&name_len) == ESP_OK)
                         {
 							sprintf(hexnum," - ");
-							if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, hexnum, 3);
-							if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, btname, name_len);
+							if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, hexnum, 3);
+							if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, btname, name_len);
 							ESP_LOGI(EXT_UART_TAG,"%s",btname);
 						} else ESP_LOGW(EXT_UART_TAG,"cannot find name for addr.");
                         
-                        if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM,nl,sizeof(nl)); //newline
+                        if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
                     }
                     ESP_LOGI(EXT_UART_TAG,"---------------------------------------");
                 } else ESP_LOGW(EXT_UART_TAG,"error getting device list");
             } else ESP_LOGE(EXT_UART_TAG,"error allocating memory for device list");
         } else {
 			ESP_LOGI(EXT_UART_TAG,"error getting bonded devices count or no devices bonded");
-			if(cmdBuffer->sendToUART != 0) uart_write_bytes(EX_UART_NUM, "END\r\n", 5);
+			if(cmdBuffer->sendToUART != 0) uart_write_bytes(ext_uart_num, "END\r\n", 5);
 		}
         return;
     }
@@ -930,26 +959,22 @@ void processCommand(struct cmdBuf *cmdBuffer)
             const esp_partition_t* factory = esp_partition_get(pi);
             esp_partition_iterator_release(pi);
             if (esp_ota_set_boot_partition(factory) == ESP_OK) {
-                uart_write_bytes(EX_UART_NUM, "OTA:start", strlen("OTA:start"));
-                uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
-				ESP_LOGI(EXT_UART_TAG, "Addon board in upgrade mode");
-				//LED off
-				#if !CONFIG_MODULE_NANO
-					gpio_set_level(INDICATOR_LED_PIN, 0);
-				#else
-					gpio_set_level(INDICATOR_LED_PIN, 1);
-				#endif
+                uart_write_bytes(ext_uart_num, "OTA:start", strlen("OTA:start"));
+                uart_write_bytes(ext_uart_num, nl, sizeof(nl));
+                ESP_LOGI(EXT_UART_TAG, "Addon board in upgrade mode");
+                //LED off
+                if(onArduinoRP2040) gpio_set_level(indicator_led, 1);
+                else gpio_set_level(indicator_led, 0);
                 esp_restart();
-            }
-            else {
+            }else {
                 ESP_LOGI(EXT_UART_TAG, "Booting factory partition not possible");
-                uart_write_bytes(EX_UART_NUM, "OTA:not possible", strlen("OTA:not possible"));
-                uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+                uart_write_bytes(ext_uart_num, "OTA:not possible", strlen("OTA:not possible"));
+                uart_write_bytes(ext_uart_num, nl, sizeof(nl));
             }
         } else {
 			ESP_LOGI(EXT_UART_TAG, "Factory partition not found");
-			uart_write_bytes(EX_UART_NUM, "OTA:not possible", strlen("OTA:not possible"));
-			uart_write_bytes(EX_UART_NUM, nl, sizeof(nl));
+			uart_write_bytes(ext_uart_num, "OTA:not possible", strlen("OTA:not possible"));
+			uart_write_bytes(ext_uart_num, nl, sizeof(nl));
 		}
         return;
     }
@@ -1049,72 +1074,71 @@ void uart_external_task(void *pvParameters)
 {
     char character;
     struct cmdBuf cmdBuffer;
-    #if !CONFIG_MODULE_NANO
-		int changePinning = 0;
-
-		/*  determine if we should switch RX/TX pins.  */
-		/*   we enable the RX pin as GPIO with pull-down.
-		 * 	 if "1" is read, this is the "real" RX pin. If not, it
-		 *   should be the TX pin. */
-		
-		gpio_config_t io_conf;
-		//disable interrupt
-		io_conf.intr_type = GPIO_INTR_DISABLE;
-		//set as output mode
-		io_conf.mode = GPIO_MODE_INPUT;
-		//bit mask, we want to set the RX pin as input
-		io_conf.pin_bit_mask = (1ULL<<EX_SERIAL_RXPIN);
-		//disable pull-down mode
-		io_conf.pull_down_en = 1;
-		//disable pull-up mode
-		io_conf.pull_up_en = 0;
-		//configure GPIO with the given settings
-		gpio_config(&io_conf);
-		
-		vTaskDelay(1);
-		
-		if(!gpio_get_level(EX_SERIAL_RXPIN))
-		{
-			ESP_LOGW(EXT_UART_TAG,"Switching pins!");
-			changePinning = 1;
-		}
-	#endif
+    int changePinning = 0;
+    
+    if(!onArduinoRP2040)
+    {
+      /*  determine if we should switch RX/TX pins.  */
+      /*   we enable the RX pin as GPIO with pull-down.
+       * 	 if "1" is read, this is the "real" RX pin. If not, it
+       *   should be the TX pin. */
+      
+      gpio_config_t io_conf;
+      //disable interrupt
+      io_conf.intr_type = GPIO_INTR_DISABLE;
+      //set as output mode
+      io_conf.mode = GPIO_MODE_INPUT;
+      //bit mask, we want to set the RX pin as input
+      io_conf.pin_bit_mask = (1ULL<<ext_uart_rx);
+      //disable pull-down mode
+      io_conf.pull_down_en = 1;
+      //disable pull-up mode
+      io_conf.pull_up_en = 0;
+      //configure GPIO with the given settings
+      gpio_config(&io_conf);
+      
+      vTaskDelay(1);
+      
+      if(!gpio_get_level(ext_uart_rx))
+      {
+        ESP_LOGW(EXT_UART_TAG,"Switching pins!");
+        changePinning = 1;
+      }
+    }
 
 
     //Install UART driver, and get the queue.
     esp_err_t ret = ESP_OK;
-    const uart_config_t uart_config = {
+    uart_config_t uart_config = {
 	/** on esp32miniBT module we use 9k6 for backwards compatibility
 	 * on Arduino Nano Connect with the uBlox Nina module we use
 	 * UART0 at 115k2 */
-	#if !CONFIG_MODULE_NANO
-		.baud_rate = 9600,
-	#else
-        .baud_rate = 115200,
-    #endif
+        .baud_rate = 9600,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
     };
+    if(onArduinoRP2040) uart_config.baud_rate = 115200;
 
     //update UART config
-    ret = uart_param_config(EX_UART_NUM, &uart_config);
+    ret = uart_param_config(ext_uart_num, &uart_config);
     if(ret != ESP_OK)
     {
         ESP_LOGE(EXT_UART_TAG,"external UART param config failed");
     }
 
     //set IO pins
-    #if !CONFIG_MODULE_NANO
-		if(changePinning) ret = uart_set_pin(EX_UART_NUM, EX_SERIAL_RXPIN, EX_SERIAL_TXPIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-		else ret = uart_set_pin(EX_UART_NUM, EX_SERIAL_TXPIN, EX_SERIAL_RXPIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-		if(ret != ESP_OK)
-		{
-			ESP_LOGE(EXT_UART_TAG,"external UART set pin failed");
-		}
-    #endif
-    uart_driver_install(EX_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
+    if(!onArduinoRP2040)
+    {
+      if(changePinning) ret = uart_set_pin(ext_uart_num, ext_uart_rx, ext_uart_tx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+      else ret = uart_set_pin(ext_uart_num, ext_uart_tx, ext_uart_rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+      if(ret != ESP_OK)
+      {
+        ESP_LOGE(EXT_UART_TAG,"external UART set pin failed");
+      }
+    }
+    uart_driver_install(ext_uart_num, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
 
     ESP_LOGI(EXT_UART_TAG,"external UART processing task started");
     cmdBuffer.state=CMDSTATE_IDLE;
@@ -1123,7 +1147,7 @@ void uart_external_task(void *pvParameters)
     while(1)
     {
         // read & process a single byte
-        uart_read_bytes(EX_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
+        uart_read_bytes(ext_uart_num, (uint8_t*) &character, 1, portMAX_DELAY);
         uart_parse_command(character, &cmdBuffer);
     }
 }
@@ -1131,8 +1155,8 @@ void uart_external_task(void *pvParameters)
 void blink_task(void *pvParameter)
 {
     // Initialize GPIO pins
-    //gpio_pad_select_gpio(INDICATOR_LED_PIN);
-    gpio_set_direction(INDICATOR_LED_PIN, GPIO_MODE_OUTPUT);
+    //gpio_pad_select_gpio(indicator_led);
+    gpio_set_direction(indicator_led, GPIO_MODE_OUTPUT);
     int blinkTime;
 
     while(1) {
@@ -1141,15 +1165,15 @@ void blink_task(void *pvParameter)
         else blinkTime=250;
 
         /* Blink off (output low) */
-        gpio_set_level(INDICATOR_LED_PIN, 0);
+        gpio_set_level(indicator_led, 0);
         vTaskDelay(blinkTime / portTICK_PERIOD_MS);
         /* Blink on (output high) */
-        gpio_set_level(INDICATOR_LED_PIN, 1);
+        gpio_set_level(indicator_led, 1);
         vTaskDelay(blinkTime / portTICK_PERIOD_MS);
     }
 }
 
-#if CONFIG_MODULE_NANO
+//#if CONFIG_MODULE_NANO
 
 int uart_vprintf_valid = 0;
 vprintf_like_t uart0_vprintf;
@@ -1160,16 +1184,14 @@ int vprintf_discard( const char *str, va_list l )
 	(void)l;
 	return 0;
 }
-#endif
+//#endif
 
 void uart_console_task(void *pvParameters)
 {
     char character;
     uint8_t kbdcmd[] = {28};
-    #if !CONFIG_MODULE_NANO
 		//use input as HID test OR as input to processCommand (test commands)
 		uint8_t hid_or_command = 0;
-	#endif
     struct cmdBuf commands;
     commands.sendToUART = 0;
     commands.state=CMDSTATE_IDLE;
@@ -1183,23 +1205,24 @@ void uart_console_task(void *pvParameters)
     {
         // read single byte
         uart_read_bytes(CONSOLE_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
-        #if CONFIG_MODULE_NANO
-			//if communcating with the RP2040, we need "dual-use" on UART0:
-			// * debugging via esp-idf logger
-			// * receiving HID stuff & commands
-			//so we simply do the same stuff as in uart_external task
-			uart_parse_command(character,&commands);
-        #else
-			//enable character forwarding to command parser (used to test the commands)
-			if(character == '$' && hid_or_command == 0) hid_or_command = 1;
-			//if command mode is enabled, forward to uart_parse_command and continue with next character receiving.
-			if(hid_or_command == 1)
-			{
-				uart_parse_command(character,&commands);
-				if(commands.state == CMDSTATE_IDLE) hid_or_command = 0;
-				continue;
-			}
-		#endif
+        if(onArduinoRP2040)
+        {
+          //if communcating with the RP2040, we need "dual-use" on UART0:
+          // * debugging via esp-idf logger
+          // * receiving HID stuff & commands
+          //so we simply do the same stuff as in uart_external task
+          uart_parse_command(character,&commands);
+        } else {
+          //enable character forwarding to command parser (used to test the commands)
+          if(character == '$' && hid_or_command == 0) hid_or_command = 1;
+          //if command mode is enabled, forward to uart_parse_command and continue with next character receiving.
+          if(hid_or_command == 1)
+          {
+            uart_parse_command(character,&commands);
+            if(commands.state == CMDSTATE_IDLE) hid_or_command = 0;
+            continue;
+          }
+        }
 
         //if not in command mode, issue HID test commands.
         if(!isConnected()) {
@@ -1311,12 +1334,47 @@ void uart_console_task(void *pvParameters)
 
 void app_main(void)
 {
+    //first of all, we need to detect if we are running on the Arduino Connect RP2040.
+    //if yes:
+    // -) different IOs for signalling & UART
+    // -) disable UART0 logging output on default
+    // -) different baudrate
+    //we use the flash size to detect the board:
+    // -) WROOM32D has 4MB
+    // -) Nina board on Arduino has 2MB
+    uint32_t size_flash_chip;
+    esp_flash_get_size(NULL, &size_flash_chip);
+    size_flash_chip = size_flash_chip >> 20; //now we have 2,4,8,..
+    if(size_flash_chip > 2)
+    {
+      ESP_LOGW(HID_DEMO_TAG,"Not on Arduino RP2040 connect, using WROOM setup");
+    } else onArduinoRP2040 = true;
+  
     esp_err_t ret;
     //if we have this firmware on the Arduino,
     //we should disable logging on startup.
-    #if CONFIG_MODULE_NANO
-		esp_log_level_set("*",ESP_LOG_ERROR);
-	#endif
+    if(onArduinoRP2040) esp_log_level_set("*",ESP_LOG_ERROR);
+    
+    //set external UART number according to setup
+    //and setup anything pin related.
+    #if CONFIG_USE_AS_FLIPMOUSE_FABI
+      if(onArduinoRP2040)
+      {
+        ext_uart_num = UART_NUM_0;
+        //GPIO26 is blue; 25 is green and 27 red
+        indicator_led = GPIO_NUM_26;
+      } else {
+        ext_uart_num = UART_NUM_2;
+        ext_uart_rx = GPIO_NUM_17;
+        ext_uart_tx = GPIO_NUM_16;
+        indicator_led = GPIO_NUM_5;
+      }
+    #else
+      ext_uart_num = CONFIG_MODULE_UART_NR;
+      ext_uart_rx = CONFIG_MODULE_RX_PIN;
+      ext_uart_tx = CONFIG_MODULE_TX_PIN;
+      indicator_led = CONFIG_MODULE_LED_PIN;
+    #endif
 
     // Initialize FreeRTOS elements
     eventgroup_system = xEventGroupCreate();
@@ -1435,9 +1493,8 @@ void app_main(void)
     
     //start active scan
     //if(esp_ble_gap_set_scan_params(&scan_params) != ESP_OK) ESP_LOGE("MAIN","Cannot set scan params");
-	#if !CONFIG_MODULE_NANO
-    xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
-    #endif
+    //a console for HID debugging (sending simple mouse/kbd commands) is not available on Arduino RP2040 Connect.
+    if(!onArduinoRP2040) xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
     xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
     ///@todo maybe reduce stack size for blink task? 4k words for blinky :-)?
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
@@ -1452,4 +1509,8 @@ void app_main(void)
     esp_timer_create(&periodic_timer_args, &periodic_timer);
     //call every 100ms
     esp_timer_start_periodic(periodic_timer, 100000);
+    
+    //avoid unused variable warnings here:
+    (void)hidd_adv_resp;
+    (void)scan_params;
 }

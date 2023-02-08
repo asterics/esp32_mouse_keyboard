@@ -6,32 +6,7 @@ menu "esp32_mouse_keyboard / FLipMouse & FABI config"
 			If this option is enabled, a FLipMouse/FABI Bluetooth module
 			is built. If disabled, this project acts as demo code for Bluetooth
 			HID code.
-	menu "FM/FP/FABI configuration"
-		visible if USE_AS_FLIPMOUSE_FABI
-		
-		choice MODULE_TYPE
-			prompt "Module type (FLipMouse/FABI/FLipPad esp32miniBT or Arduino Nano Connect)"
-			depends on USE_AS_FLIPMOUSE_FABI
-            help
-                Specify the module type. FLipMouse/FABI/FLipPad is a esp32miniBT board, this setting changes the BLE name. Nano Connect is different in pinning & UART usage.
-                
-            config MODULE_FLIPMOUSE
-                bool "FLipMouse - esp32miniBT module"
-
-            config MODULE_FABI
-                bool "FABI - esp32miniBT module"
-                
-            config MODULE_NANO
-				bool "Arduino Nano Connect RP2040 with uBlox Nina"
-		endchoice
-		
-		config FM_WEBGUI
-			bool "Enable WebGUI (UNUSED)"
-			default n
-			help
-				Enable the WebGUI for the FLipMouse in the ESP32.
-	endmenu
-	
+			
 	menu "Pinning for UART RX/TX & LED (if not a defined module)"
 		visible if !USE_AS_FLIPMOUSE_FABI
 		

@@ -2,31 +2,12 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#define MODULE_ID "ESP32miniBT_v0.3.3"
+#define MODULE_ID "ESP32miniBT_v0.3.4"
 
 #if CONFIG_USE_AS_FLIPMOUSE_FABI
-	#define EX_SERIAL_RXPIN      GPIO_NUM_17
-	#define EX_SERIAL_TXPIN      GPIO_NUM_16
-	
-	#if CONFIG_MODULE_FLIPMOUSE
-		#define GATTS_TAG "FLipMouse"
-		#define EX_UART_NUM UART_NUM_2
-		#define INDICATOR_LED_PIN GPIO_NUM5
-	#endif
-	#if CONFIG_MODULE_FABI
-		#define GATTS_TAG "FABI"
-		#define EX_UART_NUM UART_NUM_2
-		#define INDICATOR_LED_PIN GPIO_NUM_5
-	#endif
-
-	#if CONFIG_MODULE_NANO
-		//will be overwritten anyway by RP2040 FW
-		#define GATTS_TAG "esp32_nano"
-		#define EX_UART_NUM UART_NUM_0
-		//GPIO26 is blue; 25 is green and 27 red
-		#define INDICATOR_LED_PIN GPIO_NUM_26
-	#endif
-
+  //this will be overwritten by FABI/FLipMouse/FLipPad firmware to correct
+  //name, this is the BT device name for the first start
+  #define GATTS_TAG "AsTeRICS Foundation Module"
 //non FM/FP/FABI boards
 #else 
 	#define EX_UART_NUM     	 CONFIG_MODULE_UART_NR

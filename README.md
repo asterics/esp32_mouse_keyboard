@@ -50,7 +50,7 @@ This firmware is used on 2 different devices in context of our assistive devices
 __Note:__ Please select the correct type of board in `idf.py menuconfig`!
 
 __Note:__ If you want to use this firmware on a custom board, you can select the external UART interface settings in menuconfig; for our boards the pinning, baudrate and UART config is pre-defined.
- 
+
 # Usage via Console or second UART
 
 ## Control via stdin (make monitor)

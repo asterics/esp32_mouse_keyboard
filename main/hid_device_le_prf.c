@@ -197,14 +197,15 @@ static const uint8_t hidReportMap[] = {
       0x25, 0x08,   //     Logical Max (8)
       
       0x35, 0x00,   // Physical minimum (0)
-      0x46, 0x00,   // Physical maximum (315, size 2)
-      0x95, 0x06,  // Report Count (1)
+      0x46, 0x3B, 0x01, // Physical maximum (315, size 2)
+      //0x46, 0x00,   // Physical maximum (315, size 2)
+      0x95, 0x01,  // Report Count (1)
       0x75, 0x08,  // Report Size (8)
       0x81, 0x02,  // Input: (Data, Variable, Absolute)
     /* 16 bit Button Map */
       0x05, 0x09,  // Usage Page (button)
       0x19, 0x01,  //     Usage Minimum (01) - Button 1
-      0x29, 0x20,  //     Usage Maximum (32) - Button 2
+      0x29, 0x20,  //     Usage Maximum (32) - Button 32
       0x15, 0x00,   //     Logical Min (0)
       0x25, 0x01,   //     Logical Max (1)
       0x95, 0x20,  // Report Count (32)

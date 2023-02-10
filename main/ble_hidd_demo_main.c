@@ -1025,8 +1025,9 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                     timestampLastSent = esp_timer_get_time();
                 } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
                     //ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-                    uint8_t joy[HID_JOYSTICK_IN_RPT_LEN];
-                    memcpy(joy,&cmdBuffer->buf[2],HID_JOYSTICK_IN_RPT_LEN);
+                    //@todo should be HID_JOYSTICK_IN_RPT_LEN, but not available here.
+                    uint8_t joy[11];
+                    memcpy(joy,&cmdBuffer->buf[2],11);
                     //send joystick report
                     for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
                     {

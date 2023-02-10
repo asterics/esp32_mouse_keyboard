@@ -42,7 +42,11 @@
 #define HID_MAX_APPS                 1
 
 // Number of HID reports defined in the service
-#define HID_NUM_REPORTS          9
+#if CONFIG_MODULE_USEJOYSTICK
+  #define HID_NUM_REPORTS          10
+#else
+  #define HID_NUM_REPORTS          9
+#endif
 
 // HID Report IDs for the service
 #define HID_RPT_ID_KEY_IN        1   // Keyboard input report ID
@@ -60,7 +64,7 @@
 #define ATT_SVC_HID          0x1812
 
 /// Maximal number of Report Char. that can be added in the DB for one HIDS - Up to 11
-#define HIDD_LE_NB_REPORT_INST_MAX            (5)
+#define HIDD_LE_NB_REPORT_INST_MAX            (6)
 
 /// Maximal length of Report Char. Value
 #define HIDD_LE_REPORT_MAX_LEN                (255)
@@ -138,17 +142,25 @@ enum {
     HIDD_LE_IDX_REPORT_LED_OUT_CHAR,
     HIDD_LE_IDX_REPORT_LED_OUT_VAL,
     HIDD_LE_IDX_REPORT_LED_OUT_REP_REF,
-
-    HIDD_LE_IDX_REPORT_CC_IN_CHAR,
-    HIDD_LE_IDX_REPORT_CC_IN_VAL,
-    HIDD_LE_IDX_REPORT_CC_IN_CCC,
-    HIDD_LE_IDX_REPORT_CC_IN_REP_REF,
     
     // Report mouse input
     HIDD_LE_IDX_REPORT_MOUSE_IN_CHAR,
     HIDD_LE_IDX_REPORT_MOUSE_IN_VAL,
     HIDD_LE_IDX_REPORT_MOUSE_IN_CCC,
     HIDD_LE_IDX_REPORT_MOUSE_REP_REF,
+    
+    //Report joystick input 
+    #if CONFIG_MODULE_USEJOYSTICK
+      HIDD_LE_IDX_REPORT_JOY_IN_CHAR,
+      HIDD_LE_IDX_REPORT_JOY_IN_VAL,
+      HIDD_LE_IDX_REPORT_JOY_IN_CCC,
+      HIDD_LE_IDX_REPORT_JOY_REP_REF,   
+    #endif
+    
+    HIDD_LE_IDX_REPORT_CC_IN_CHAR,
+    HIDD_LE_IDX_REPORT_CC_IN_VAL,
+    HIDD_LE_IDX_REPORT_CC_IN_CCC,
+    HIDD_LE_IDX_REPORT_CC_IN_REP_REF,
     
     // Boot Keyboard Input Report
     HIDD_LE_IDX_BOOT_KB_IN_REPORT_CHAR,
@@ -173,64 +185,6 @@ enum {
     HIDD_LE_IDX_NB,
 };
 
-
-/// Attribute Table Indexes
-enum {
-    HIDD_LE_INFO_CHAR,
-    HIDD_LE_CTNL_PT_CHAR,
-    HIDD_LE_REPORT_MAP_CHAR,
-    HIDD_LE_REPORT_CHAR,
-    HIDD_LE_PROTO_MODE_CHAR,
-    HIDD_LE_BOOT_KB_IN_REPORT_CHAR,
-    HIDD_LE_BOOT_KB_OUT_REPORT_CHAR,
-    HIDD_LE_BOOT_MOUSE_IN_REPORT_CHAR,
-    HIDD_LE_CHAR_MAX //= HIDD_LE_REPORT_CHAR + HIDD_LE_NB_REPORT_INST_MAX,
-};
-
-///att read event table Indexs
-enum {
-    HIDD_LE_READ_INFO_EVT,
-    HIDD_LE_READ_CTNL_PT_EVT,
-    HIDD_LE_READ_REPORT_MAP_EVT,
-    HIDD_LE_READ_REPORT_EVT,
-    HIDD_LE_READ_PROTO_MODE_EVT,
-    HIDD_LE_BOOT_KB_IN_REPORT_EVT,
-    HIDD_LE_BOOT_KB_OUT_REPORT_EVT,
-    HIDD_LE_BOOT_MOUSE_IN_REPORT_EVT,
-
-    HID_LE_EVT_MAX
-};
-
-/// Client Characteristic Configuration Codes
-enum {
-    HIDD_LE_DESC_MASK = 0x10,
-
-    HIDD_LE_BOOT_KB_IN_REPORT_CFG     = HIDD_LE_BOOT_KB_IN_REPORT_CHAR | HIDD_LE_DESC_MASK,
-    HIDD_LE_BOOT_MOUSE_IN_REPORT_CFG  = HIDD_LE_BOOT_MOUSE_IN_REPORT_CHAR | HIDD_LE_DESC_MASK,
-    HIDD_LE_REPORT_CFG                = HIDD_LE_REPORT_CHAR | HIDD_LE_DESC_MASK,
-};
-
-/// Features Flag Values
-enum {
-    HIDD_LE_CFG_KEYBOARD      = 0x01,
-    HIDD_LE_CFG_MOUSE         = 0x02,
-    HIDD_LE_CFG_PROTO_MODE    = 0x04,
-    HIDD_LE_CFG_MAP_EXT_REF   = 0x08,
-    HIDD_LE_CFG_BOOT_KB_WR    = 0x10,
-    HIDD_LE_CFG_BOOT_MOUSE_WR = 0x20,
-};
-
-/// Report Char. Configuration Flag Values
-enum {
-    HIDD_LE_CFG_REPORT_IN     = 0x01,
-    HIDD_LE_CFG_REPORT_OUT    = 0x02,
-    //HOGPD_CFG_REPORT_FEAT can be used as a mask to check Report type
-    HIDD_LE_CFG_REPORT_FEAT   = 0x03,
-    HIDD_LE_CFG_REPORT_WR     = 0x10,
-};
-
-/// Pointer to the connection clean-up function
-#define HIDD_LE_CLEANUP_FNCT        (NULL)
 
 /*
  * TYPE DEFINITIONS

@@ -1010,30 +1010,35 @@ void uart_parse_command (uint8_t character, struct cmdBuf * cmdBuffer)
                 ESP_LOGI(EXT_UART_TAG,"not connected, cannot send report");
             } else {
                 if (cmdBuffer->buf[1] == 0x00) {   // keyboard report
-					//if hid_conn_id is set (!= -1) we send to one device only. Send to all otherwise
-					if(hid_conn_id == -1)
-					{
-						for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
-						{
-							if(active_hid_conn_ids[i] != -1) esp_hidd_send_keyboard_value(active_hid_conn_ids[i],cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
-						}
-					} else {
-						esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
-					}
+            //if hid_conn_id is set (!= -1) we send to one device only. Send to all otherwise
+            if(hid_conn_id == -1)
+            {
+              for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+              {
+                if(active_hid_conn_ids[i] != -1) esp_hidd_send_keyboard_value(active_hid_conn_ids[i],cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+              }
+            } else {
+              esp_hidd_send_keyboard_value(hid_conn_id,cmdBuffer->buf[0],&cmdBuffer->buf[2],6);
+            }
                     
-                    //update timestamp
-                    timestampLastSent = esp_timer_get_time();
-                } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
-                    //ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5]);
-                    //@todo should be HID_JOYSTICK_IN_RPT_LEN, but not available here.
-                    uint8_t joy[11];
-                    memcpy(joy,&cmdBuffer->buf[2],11);
-                    //send joystick report
-                    for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
-                    {
-                      if(active_hid_conn_ids[i] != -1) esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
-                    }
-                } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
+              //update timestamp
+              timestampLastSent = esp_timer_get_time();
+          } else if (cmdBuffer->buf[1] == 0x01) {  // joystick report
+              ESP_LOGI(EXT_UART_TAG,"joystick: axis: 0x%X:0x%X:0x%X:0x%X, hat: %d",cmdBuffer->buf[2],cmdBuffer->buf[3],cmdBuffer->buf[4],cmdBuffer->buf[5],cmdBuffer->buf[8]);
+              ESP_LOGI(EXT_UART_TAG,"joystick: buttons: 0x%X:0x%X:0x%X:0x%X",cmdBuffer->buf[9],cmdBuffer->buf[10],cmdBuffer->buf[11],cmdBuffer->buf[12]);
+              //@todo should be HID_JOYSTICK_IN_RPT_LEN, but not available here.
+              uint8_t joy[11];
+              memcpy(joy,&cmdBuffer->buf[2],11);
+              //send joystick report
+              #if CONFIG_MODULE_USEJOYSTICK
+              for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+              {
+                if(active_hid_conn_ids[i] != -1) esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
+              }
+              #else
+              ESP_LOGE(EXT_UART_TAG,"built without joystick support, cannot fix that!");
+              #endif
+          } else if (cmdBuffer->buf[1] == 0x03) {  // mouse report
 					if(hid_conn_id == -1)
 					{
 						for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
@@ -1245,6 +1250,55 @@ void uart_console_task(void *pvParameters)
 				}
 				ESP_LOGI(CONSOLE_UART_TAG,"consumer: mute");
 				break;
+    #if CONFIG_MODULE_USEJOYSTICK
+			case '1':
+        uint8_t joy1[11] = {0};
+        joy1[8] = 0x01;
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy1);
+					}
+				}
+				ESP_LOGI(CONSOLE_UART_TAG,"joystick button 1: press");
+				break;
+			case '2':
+        uint8_t joy2[11] = {0};
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy2);
+					}
+				}
+				ESP_LOGI(CONSOLE_UART_TAG,"joystick release");
+				break;
+			case '3':
+        uint8_t joy3[11] = {0};
+        joy3[0] = 127;
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy3);
+					}
+				}
+				ESP_LOGI(CONSOLE_UART_TAG,"joystick axis1: 127");
+				break;
+			case '4':
+        uint8_t joy4[11] = {0};
+        joy4[0] = 0xFF;
+				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
+				{
+					if(active_hid_conn_ids[i] != -1)
+					{
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy4);
+					}
+				}
+				ESP_LOGI(CONSOLE_UART_TAG,"joystick axis1: -127");
+				break;
+    #endif
 			case 'p':
 				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
 				{

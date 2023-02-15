@@ -41,6 +41,8 @@ With `idf.py -p (PORT) flash` or `make flash` you can upload this build to an ES
 With `idf.py -p (PORT) monitor` or `make monitor` you can see the debug output (please use this output if you open an issue) or trigger basic test commands (mouse movement or a keyboard key press) on
 a connected target.
 
+__Note: Currently tested IDF version: release/v5.0 (other ones won't be supported!)__
+
 ### esp32miniBT vs. Arduino Nano Connect
 
 This firmware is used on 2 different devices in context of our assistive devices:

@@ -41,6 +41,8 @@ With `idf.py -p (PORT) flash` or `make flash` you can upload this build to an ES
 With `idf.py -p (PORT) monitor` or `make monitor` you can see the debug output (please use this output if you open an issue) or trigger basic test commands (mouse movement or a keyboard key press) on
 a connected target.
 
+__Note: Currently tested IDF version: release/v5.0 (other ones won't be supported!)__
+
 ### esp32miniBT vs. Arduino Nano Connect
 
 This firmware is used on 2 different devices in context of our assistive devices:
@@ -50,7 +52,7 @@ This firmware is used on 2 different devices in context of our assistive devices
 __Note:__ Please select the correct type of board in `idf.py menuconfig`!
 
 __Note:__ If you want to use this firmware on a custom board, you can select the external UART interface settings in menuconfig; for our boards the pinning, baudrate and UART config is pre-defined.
- 
+
 # Usage via Console or second UART
 
 ## Control via stdin (make monitor)
@@ -114,7 +116,14 @@ _Note:_ currently we only support the US keyboard layout.
 
 |Byte 0|Byte 1|Byte 2|Byte 3|Byte 4|Byte 5|Byte 6|Byte 7|Byte 8|
 |------|------|------|------|------|------|------|------|------|
-| 0xFD | modifier mask | don't care | keycode 1 | keycode 2 | keycode 3 | keycode 4 | keycode 5 | keycode 6 |
+| 0xFD | modifier mask | 0x00   | keycode 1 | keycode 2 | keycode 3 | keycode 4 | keycode 5 | keycode 6 |
+
+__Joystick:__
+
+
+|Byte 0|Byte 1|Byte 2|Byte 3-8|Byte 9|Byte 10|Byte 11|Byte 12|Byte 13|
+|------|------|------|------|------|------|------|------|------|
+| 0xFD | don't care | 0x01  | X,Y,Z,Rz,Rx,Ry axis (each _int8_t_) | hat switch (0 is rest position; 1-8 are directions) | buttons 0-7 | buttons 8-15 | buttons 16-23 | buttons 24-31 |
 
 
 ## RAW HID input from sourcecode
@@ -138,7 +147,6 @@ Please use the functions provided by `esp_hidd_prf_api.c`.
 - Paul Stoffregen for the implementation of the keyboard layouts for his Teensyduino project: www.pjrc.com
 - Neil Kolban for his great contributions to the ESP32 SW (in particular the Bluetooth support): https://github.com/nkolban
 - Chegewara for help and support
- 
-and to Espressif for providing the HID implementation within the esp-idf.
 
+and to Espressif for providing the HID implementation within the esp-idf.
 

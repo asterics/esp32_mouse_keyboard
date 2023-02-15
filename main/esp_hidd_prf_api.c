@@ -20,13 +20,17 @@
 #include "esp_log.h"
 
 // HID keyboard input report length
-#define HID_KEYBOARD_IN_RPT_LEN     8
+///@note Set to 7, because padding byte is removed
+#define HID_KEYBOARD_IN_RPT_LEN     7
 
 // HID LED output report length
-#define HID_LED_OUT_RPT_LEN         1
+//#define HID_LED_OUT_RPT_LEN         1
 
 // HID mouse input report length
 #define HID_MOUSE_IN_RPT_LEN        5
+
+// HID joystick input report length
+#define HID_JOYSTICK_IN_RPT_LEN     11
 
 // HID consumer control input report length
 #define HID_CC_IN_RPT_LEN           2
@@ -118,7 +122,9 @@ void esp_hidd_send_consumer_value(uint16_t conn_id, uint8_t key_cmd, bool key_pr
 
 void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask, uint8_t *keyboard_cmd, uint8_t num_key)
 {
-    if (num_key > HID_KEYBOARD_IN_RPT_LEN - 2) {
+    //if (num_key > HID_KEYBOARD_IN_RPT_LEN - 2) {
+    ///@note Here without padding byte as well.
+    if (num_key > HID_KEYBOARD_IN_RPT_LEN - 1) {
         ESP_LOGE(HID_LE_PRF_TAG, "%s(), the number key should not be more than %d", __func__, HID_KEYBOARD_IN_RPT_LEN);
         return;
     }
@@ -128,10 +134,13 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
     buffer[0] = special_key_mask;
     
     for (int i = 0; i < num_key; i++) {
-        buffer[i+2] = keyboard_cmd[i];
+        ///@note start @1 instead of @2 with padding byte.
+        buffer[i+1] = keyboard_cmd[i];
     }
 
-    ESP_LOGD(HID_LE_PRF_TAG, "the key vaule = %d,%d,%d, %d, %d, %d,%d, %d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
+    //ESP_LOGD(HID_LE_PRF_TAG, "the key value = %d,%d,%d, %d, %d, %d,%d, %d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
+    ///@note here is the padding byte removed as well.
+    ESP_LOGD(HID_LE_PRF_TAG, "the key value = %d,%d,%d, %d, %d, %d,%d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6]);
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
                         HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
     return;
@@ -152,5 +161,51 @@ void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mi
     return;
 }
 
+#if CONFIG_MODULE_USEJOYSTICK
+/**
+ *
+ * @brief           Send a Joystick report, set individual axis
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           x,y,z,rz,rx,ry  Individual gamepad axis
+ * @param           hat Hat switch status. Send 0 for rest/middleposition; 1-8 to for a direction.
+ * @param           buttons Button bitmap, button 0 is bit 0 and so on.
+ */
+void esp_hidd_send_joy_value(uint16_t conn_id, int8_t x, int8_t y, int8_t z, int8_t rz, int8_t rx, int8_t ry, uint8_t hat, uint32_t buttons)
+{
+  uint8_t data[HID_JOYSTICK_IN_RPT_LEN] = {0};
+  
+  //build axis into array
+  data[0] = x;
+  data[1] = y;
+  data[2] = z;
+  data[3] = rz;
+  data[4] = rx;
+  data[5] = ry;
+  
+  //add hat & buttons
+  data[6] = hat;
+  data[7] = (uint8_t)(buttons & 0xFF);
+  data[8] = (uint8_t)((buttons>>8) & 0xFF);
+  data[9] = (uint8_t)((buttons>>16) & 0xFF);
+  data[10] = (uint8_t)((buttons>>24) & 0xFF);
+  
+  //use other joystick function to send data
+  esp_hidd_send_joy_report(conn_id, data);
+}
 
+/**
+ *
+ * @brief           Send a Joystick report, use a byte array
+ *
+ * @param           conn_id HID over GATT connection ID to be used.
+ * @param           report  Pointer to a 11 Byte sized array which contains the full joystick/gamepad report
+ * @warning         This function reads 11 Bytes and sends them without checks.
+ */
+void esp_hidd_send_joy_report(uint16_t conn_id, uint8_t *report)
+{
+  hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
+    HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT, HID_JOYSTICK_IN_RPT_LEN, report);
+}
 
+#endif

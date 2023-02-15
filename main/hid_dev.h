@@ -249,9 +249,5 @@ void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id,
 
 void hid_consumer_build_report(uint8_t *buffer, consumer_cmd_t cmd);
 
-void hid_keyboard_build_report(uint8_t *buffer, keyboard_cmd_t cmd);
-
-void hid_mouse_build_report(uint8_t *buffer, mouse_cmd_t cmd);
-
 #endif /* HID_DEV_H__ */
 

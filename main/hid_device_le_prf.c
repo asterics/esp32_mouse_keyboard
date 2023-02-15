@@ -136,6 +136,8 @@ static const uint8_t hidReportMap[] = {
     0x75, 0x04,   //   Report Size (4)
     0x95, 0x01,   //   Report Count (1)
     0x81, 0x00,   //   Input (Data, Ary, Abs)
+    /** @note no idea what this is used for, but it destroys the byte alignment.
+
     0x09, 0x80,   //   Usage (Selection)
     0xA1, 0x02,   //   Collection (Logical)
     0x05, 0x09,   //     Usage Pg (Button)
@@ -146,7 +148,10 @@ static const uint8_t hidReportMap[] = {
     0x75, 0x02,   //     Report Size (2)
     0x81, 0x00,   //     Input (Data, Ary, Abs)
     0xC0,           //   End Collection
+    
     0x81, 0x03,   //   Input (Const, Var, Abs)
+    * 
+    * */
     0xC0,            // End Collection
     
     

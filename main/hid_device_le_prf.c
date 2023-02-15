@@ -54,9 +54,14 @@ static const uint8_t hidReportMap[] = {
     0x81, 0x02,  //   Input: (Data, Variable, Absolute)
     //
     //   Reserved byte
+    ///@todo  do we need this reserved byte when removing the LED output? (if removed, the report must be adjusted as well!!!)
+    ///@note Will try, because 4 Bytes are necessary to save...
+    /**
     0x95, 0x01,  //   Report Count (1)
     0x75, 0x08,  //   Report Size (8)
     0x81, 0x01,  //   Input: (Constant)
+    */
+    /**
     //
     //   LED report
     0x95, 0x05,  //   Report Count (5)
@@ -70,6 +75,7 @@ static const uint8_t hidReportMap[] = {
     0x95, 0x01,  //   Report Count (1)
     0x75, 0x03,  //   Report Size (3)
     0x91, 0x01,  //   Output: (Constant)
+    **/
     //
     //   Key arrays (6 bytes)
     0x95, 0x06,  //   Report Count (6)
@@ -87,6 +93,7 @@ static const uint8_t hidReportMap[] = {
     0x09, 0x01,   // Usage (Consumer Control)
     0xA1, 0x01,   // Collection (Application)
     0x85, 0x02,   // Report Id (2)
+    /**
     0x09, 0x02,   //   Usage (Numeric Key Pad)
     0xA1, 0x02,   //   Collection (Logical)
     0x05, 0x09,   //     Usage Pg (Button)
@@ -98,6 +105,7 @@ static const uint8_t hidReportMap[] = {
     0x95, 0x01,   //     Report Count (1)
     0x81, 0x00,   //     Input (Data, Ary, Abs)
     0xC0,         //   End Collection
+    **/
     0x05, 0x0C,   //   Usage Pg (Consumer Devices)
     0x09, 0x86,   //   Usage (Channel)
     0x15, 0xFF,   //   Logical Min (-1)
@@ -244,7 +252,7 @@ struct gatts_profile_inst {
 hidd_le_env_t hidd_le_env;
 
 // HID report map length
-uint16_t hidReportMapLen = sizeof(hidReportMap);
+uint8_t hidReportMapLen = sizeof(hidReportMap);
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 
 // HID report mapping table
@@ -270,6 +278,7 @@ static uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN] =
 static uint8_t hidReportRefJoyIn[HID_REPORT_REF_LEN] =
              { HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT };
 #endif
+
 
 // HID Report Reference characteristic descriptor, key input
 static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
@@ -440,12 +449,13 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                        ESP_GATT_PERM_READ,
                                                                        sizeof(hidReportRefKeyIn), sizeof(hidReportRefKeyIn),
                                                                        hidReportRefKeyIn}},
-
+/**
      // Report Characteristic Declaration
     [HIDD_LE_IDX_REPORT_LED_OUT_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
                                                                          ESP_GATT_PERM_READ,
                                                                          CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
                                                                          (uint8_t *)&char_prop_read_write_write_nr}},
+
 
     [HIDD_LE_IDX_REPORT_LED_OUT_VAL]            = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
                                                                        ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE,
@@ -455,6 +465,7 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                        ESP_GATT_PERM_READ,
                                                                        sizeof(hidReportRefLedOut), sizeof(hidReportRefLedOut),
                                                                        hidReportRefLedOut}},
+**/
                                                                        
     [HIDD_LE_IDX_REPORT_MOUSE_IN_CHAR]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
                                                                          ESP_GATT_PERM_READ,
@@ -634,7 +645,7 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         case ESP_GATTS_CLOSE_EVT:
             break;
         case ESP_GATTS_WRITE_EVT: {
-            esp_hidd_cb_param_t cb_param = {0};
+            /**esp_hidd_cb_param_t cb_param = {0};
             if (param->write.handle == hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_LED_OUT_VAL] &&
                 hidd_le_env.hidd_cb != NULL) {
                 cb_param.vendor_write.conn_id = param->write.conn_id;
@@ -642,7 +653,8 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 cb_param.vendor_write.length = param->write.len;
                 cb_param.vendor_write.data = param->write.value;
                 (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_LED_OUT_WRITE_EVT, &cb_param);
-            }
+            }**/
+            ESP_LOGE(HID_LE_PRF_TAG,"%s(), write evt, but no out report",__func__);
             break;
         }
         case ESP_GATTS_CREAT_ATTR_TAB_EVT: {
@@ -821,12 +833,14 @@ static void hid_add_id_tbl(void)
       index++;
       
       // LED output report
+      /**
       hid_rpt_map[index].id = hidReportRefLedOut[0];
       hid_rpt_map[index].type = hidReportRefLedOut[1];
       hid_rpt_map[index].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_LED_OUT_VAL];
       hid_rpt_map[index].cccdHandle = 0;
       hid_rpt_map[index].mode = HID_PROTOCOL_MODE_REPORT;
       index++;
+      **/
       
       // Mouse input report
       hid_rpt_map[index].id = hidReportRefMouseIn[0];

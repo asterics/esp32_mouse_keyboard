@@ -421,6 +421,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         xEventGroupSetBits(eventgroup_system,SYSTEM_CURRENTLY_ADVERTISING);
         break;
     }
+    /**
     case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT: {
         ESP_LOGI(HID_DEMO_TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT", __func__);
         ESP_LOG_BUFFER_HEX(HID_DEMO_TAG, param->vendor_write.data, param->vendor_write.length);
@@ -430,6 +431,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         ESP_LOGI(HID_DEMO_TAG, "%s, ESP_HIDD_EVENT_BLE_LED_OUT_WRITE_EVT, keyboard LED value: %d", __func__, param->vendor_write.data[0]);
         break;
     }
+    */
     
     case ESP_HIDD_EVENT_BLE_CONGEST: {
 		if(param->congest.congested)
@@ -555,6 +557,7 @@ void processCommand(struct cmdBuf *cmdBuffer)
     // $SW aabbccddeeff (select a BT addr to send the HID commands to)
     // $GC get connected devices
     // $NAME set name of bluetooth device
+    // $APx (0-4) Set the appearance value for advertising (0x03C0 - 0x03C4). See https://specificationrefs.bluetooth.com/assigned-values/Appearance%20Values.pdf page 8
     // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
     // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
     // $CV clear all key/value pairs set with $SV
@@ -569,6 +572,32 @@ void processCommand(struct cmdBuf *cmdBuffer)
     esp_ble_bond_dev_t * btdevlist;
     int counter;
     esp_err_t ret;
+    
+  /**++++ set BLE appearance ++++*/
+  if(strncmp(input,"AP ", 2) == 0)
+  {
+    uint8_t appv = input[2] - '0';
+    if(appv <= 4)
+    {
+      ESP_LOGI(EXT_UART_TAG,"setting appearance to NVS, will show on next reboot");
+      nvs_set_u8(nvs_storage_h,"BLEAPPEAR",appv);
+			nvs_commit(nvs_storage_h);
+      if(cmdBuffer->sendToUART != 0) 
+      {
+        uart_write_bytes(ext_uart_num, "AP:",strlen("AP:"));
+        uart_write_bytes(ext_uart_num, &input[2],1);
+        uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
+      }
+    } else {
+      ESP_LOGE(EXT_UART_TAG,"Cannot set appearance, value not correct. Use AP0 - AP4");
+      if(cmdBuffer->sendToUART != 0) 
+      {
+        uart_write_bytes(ext_uart_num, "AP:invalid number, AP0-AP4",strlen("AP:invalid number, AP0-AP4"));
+        uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
+      }
+    }
+    return;
+  }
 	
 	/**++++en-/disable logging++++*/
 	if(strcmp(input,"LG0") == 0)
@@ -1499,6 +1528,15 @@ void app_main(void)
     ret = nvs_open("kvstorage", NVS_READWRITE, &nvs_storage_h);
     if(ret != ESP_OK) ESP_LOGE("MAIN","error opening NVS for key/value storage");
     
+    //read the appearance value for advertising
+    uint8_t advapp;
+    ret = nvs_get_u8(nvs_storage_h,"BLEAPPEAR",&advapp);
+    if(ret == ESP_OK)
+    {
+      ESP_LOGI("MAIN","Setting appearance to 0x03C%d",advapp);
+      hidd_adv_data.appearance = 0x03C0 + advapp;
+    }
+    
     // Read config
     nvs_handle my_handle;
     ESP_LOGI("MAIN","loading configuration from NVS");
@@ -1527,9 +1565,9 @@ void app_main(void)
     ///clear the HID connection IDs&MACs
     for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS;i++)
     {
-		active_hid_conn_ids[i] = -1;
-		memset(active_connections[i],0,sizeof(esp_bd_addr_t));
-	}
+      active_hid_conn_ids[i] = -1;
+      memset(active_connections[i],0,sizeof(esp_bd_addr_t));
+    }
     ///register the callback function to the gap module
     esp_ble_gap_register_callback(gap_event_handler);
     esp_hidd_register_callbacks(hidd_event_callback);

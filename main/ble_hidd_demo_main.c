@@ -1126,12 +1126,9 @@ void uart_external_task(void *pvParameters)
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,        
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
     };
-    
-    #ifdef UART_SCLK_DEFAULT
-		#error "You are using esp-idf v5. This won't work with Windows. Use v4.x instead, or delete this line."
-	#endif
     
     if(onArduinoRP2040) uart_config.baud_rate = 115200;
 

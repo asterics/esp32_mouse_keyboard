@@ -1156,8 +1156,9 @@ void uart_external_task(void *pvParameters)
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT        
+        .source_clk = UART_SCLK_DEFAULT,
     };
+    
     if(onArduinoRP2040) uart_config.baud_rate = 115200;
 
     //update UART config
@@ -1234,6 +1235,9 @@ void uart_console_task(void *pvParameters)
     struct cmdBuf commands;
     commands.sendToUART = 0;
     commands.state=CMDSTATE_IDLE;
+    #if CONFIG_MODULE_USEJOYSTICK
+		uint8_t joy[11] = {0};
+	#endif
 
     //Install UART driver, and get the queue.
     uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
@@ -1281,48 +1285,44 @@ void uart_console_task(void *pvParameters)
 				break;
     #if CONFIG_MODULE_USEJOYSTICK
 			case '1':
-        uint8_t joy1[11] = {0};
-        joy1[8] = 0x01;
+				joy[8] = 0x01;
 				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
 				{
 					if(active_hid_conn_ids[i] != -1)
 					{
-						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy1);
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
 					}
 				}
 				ESP_LOGI(CONSOLE_UART_TAG,"joystick button 1: press");
 				break;
 			case '2':
-        uint8_t joy2[11] = {0};
 				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
 				{
 					if(active_hid_conn_ids[i] != -1)
 					{
-						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy2);
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
 					}
 				}
 				ESP_LOGI(CONSOLE_UART_TAG,"joystick release");
 				break;
 			case '3':
-        uint8_t joy3[11] = {0};
-        joy3[0] = 127;
+				joy[0] = 127;
 				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
 				{
 					if(active_hid_conn_ids[i] != -1)
 					{
-						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy3);
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
 					}
 				}
 				ESP_LOGI(CONSOLE_UART_TAG,"joystick axis1: 127");
 				break;
 			case '4':
-        uint8_t joy4[11] = {0};
-        joy4[0] = 0xFF;
+				joy[0] = 0xFF;
 				for(uint8_t i = 0; i<CONFIG_BT_ACL_CONNECTIONS; i++)
 				{
 					if(active_hid_conn_ids[i] != -1)
 					{
-						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy4);
+						esp_hidd_send_joy_report(active_hid_conn_ids[i],joy);
 					}
 				}
 				ESP_LOGI(CONSOLE_UART_TAG,"joystick axis1: -127");

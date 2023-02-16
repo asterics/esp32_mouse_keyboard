@@ -225,8 +225,8 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
     .include_txpower = true,
-    .min_interval = 0x000A, //slave connection min interval, Time = min_interval * 1.25 msec
-    .max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
+    .min_interval = 0x000C, //slave connection min interval, Time = min_interval * 1.25 msec (changed to 15ms for sh**t devices of apple)
+    .max_interval = 0x000C, //slave connection max interval, Time = max_interval * 1.25 msec (changed to 15ms for sh**t devices of apple)
     /** @note: HID generic appearance does not work on some iOS/Amazon FireTV Sticks, see https://github.com/asterics/esp32_mouse_keyboard/issues/52 */
     .appearance = 0x03c2,       //HID Mouse (keyboard: 0x03c1)
     .manufacturer_len = 0,

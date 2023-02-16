@@ -31,11 +31,12 @@ struct prf_char_pres_fmt
     uint8_t name_space;
 };
 
+static uint8_t gamepadenabled = 0;
+
 // HID report mapping table
 static hid_report_map_t hid_rpt_map[HID_NUM_REPORTS];
 
-// HID Report Map characteristic value
-// Keyboard report descriptor (using format for Boot interface descriptor)
+// HID Report Map characteristic value - including Mouse, Consumer Control, Keyboard & Joystick (if enabled)
 static const uint8_t hidReportMap[] = {
     0x05, 0x01,  // Usage Pg (Generic Desktop)
     0x09, 0x06,  // Usage (Keyboard)
@@ -228,6 +229,103 @@ static const uint8_t hidReportMap[] = {
     #endif
 
 };
+// HID Report Map characteristic value - including Mouse, Consumer Control, Keyboard (joystick disabled on runtime)
+#if CONFIG_MODULE_USEJOYSTICK
+static const uint8_t hidReportMapNoJoy[] = {
+    0x05, 0x01,  // Usage Pg (Generic Desktop)
+    0x09, 0x06,  // Usage (Keyboard)
+    0xA1, 0x01,  // Collection: (Application)
+    0x85, 0x01,  // Report Id (1)
+    //
+    0x05, 0x07,  //   Usage Pg (Key Codes)
+    0x19, 0xE0,  //   Usage Min (224)
+    0x29, 0xE7,  //   Usage Max (231)
+    0x15, 0x00,  //   Log Min (0)
+    0x25, 0x01,  //   Log Max (1)
+    //
+    //   Modifier byte
+    0x75, 0x01,  //   Report Size (1)
+    0x95, 0x08,  //   Report Count (8)
+    0x81, 0x02,  //   Input: (Data, Variable, Absolute)
+    //
+    //   Key arrays (6 bytes)
+    0x95, 0x06,  //   Report Count (6)
+    0x75, 0x08,  //   Report Size (8)
+    0x15, 0x00,  //   Log Min (0)
+    0x25, 0x65,  //   Log Max (101)
+    0x05, 0x07,  //   Usage Pg (Key Codes)
+    0x19, 0x00,  //   Usage Min (0)
+    0x29, 0x65,  //   Usage Max (101)
+    0x81, 0x00,  //   Input: (Data, Array)
+    //
+    0xC0,        // End Collection
+    //
+    0x05, 0x0C,   // Usage Pg (Consumer Devices)
+    0x09, 0x01,   // Usage (Consumer Control)
+    0xA1, 0x01,   // Collection (Application)
+    0x85, 0x02,   // Report Id (2)
+    0x05, 0x0C,   //   Usage Pg (Consumer Devices)
+    0x09, 0x86,   //   Usage (Channel)
+    0x15, 0xFF,   //   Logical Min (-1)
+    0x25, 0x01,   //   Logical Max (1)
+    0x75, 0x02,   //   Report Size (2)
+    0x95, 0x01,   //   Report Count (1)
+    0x81, 0x46,   //   Input (Data, Var, Rel, Null)
+    0x09, 0xE9,   //   Usage (Volume Up)
+    0x09, 0xEA,   //   Usage (Volume Down)
+    0x15, 0x00,   //   Logical Min (0)
+    0x75, 0x01,   //   Report Size (1)
+    0x95, 0x02,   //   Report Count (2)
+    0x81, 0x02,   //   Input (Data, Var, Abs)
+    0x09, 0xE2,   //   Usage (Mute)
+    0x09, 0x30,   //   Usage (Power)
+    0x09, 0x83,   //   Usage (Recall Last)
+    0x09, 0x81,   //   Usage (Assign Selection)
+    0x09, 0xB0,   //   Usage (Play)
+    0x09, 0xB1,   //   Usage (Pause)
+    0x09, 0xB2,   //   Usage (Record)
+    0x09, 0xB3,   //   Usage (Fast Forward)
+    0x09, 0xB4,   //   Usage (Rewind)
+    0x09, 0xB5,   //   Usage (Scan Next)
+    0x09, 0xB6,   //   Usage (Scan Prev)
+    0x09, 0xB7,   //   Usage (Stop)
+    0x15, 0x01,   //   Logical Min (1)
+    0x25, 0x0C,   //   Logical Max (12)
+    0x75, 0x04,   //   Report Size (4)
+    0x95, 0x01,   //   Report Count (1)
+    0x81, 0x00,   //   Input (Data, Ary, Abs)
+    0xC0,            // End Collection
+    
+    0x05, 0x01,  // Usage Page (Generic Desktop)
+    0x09, 0x02,  // Usage (Mouse)
+    0xA1, 0x01,  // Collection (Application)
+    0x85, 0x03,  // Report Id (3)
+    0x09, 0x01,  //   Usage (Pointer)
+    0xA1, 0x00,  //   Collection (Physical)
+    0x05, 0x09,  //     Usage Page (Buttons)
+    0x19, 0x01,  //     Usage Minimum (01) - Button 1
+    0x29, 0x03,  //     Usage Maximum (03) - Button 3
+    0x15, 0x00,  //     Logical Minimum (0)
+    0x25, 0x01,  //     Logical Maximum (1)
+    0x75, 0x01,  //     Report Size (1)
+    0x95, 0x03,  //     Report Count (3)
+    0x81, 0x02,  //     Input (Data, Variable, Absolute) - Button states
+    0x75, 0x05,  //     Report Size (5)
+    0x95, 0x01,  //     Report Count (1)
+    0x81, 0x01,  //     Input (Constant) - Padding or Reserved bits
+    0x05, 0x01,  //     Usage Page (Generic Desktop)
+    0x09, 0x30,  //     Usage (X)
+    0x09, 0x31,  //     Usage (Y)
+    0x09, 0x38,  //     Usage (Wheel)
+    0x15, 0x81,  //     Logical Minimum (-127)
+    0x25, 0x7F,  //     Logical Maximum (127)
+    0x75, 0x08,  //     Report Size (8)
+    0x95, 0x03,  //     Report Count (3)
+    0x81, 0x06,  //     Input (Data, Variable, Relative) - X & Y coordinate
+    0xC0,        //   End Collection
+    0xC0,        // End Collection
+};
+#endif
 
 /// Battery Service Attributes Indexes
 enum
@@ -257,6 +355,7 @@ struct gatts_profile_inst {
 hidd_le_env_t hidd_le_env;
 
 // HID report map length
+///@note This line is just used to trigger a warning if the 255B limit is reached
 uint8_t hidReportMapLen = sizeof(hidReportMap);
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 
@@ -370,7 +469,7 @@ static const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] =
 };
 
 
-/// Full Hid device Database Description - Used to add attributes into the database
+/// Full Hid device Database Description - Used to add attributes into the database - with Joystick report
 static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
 {
             // HID Service Declaration
@@ -454,23 +553,6 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                        ESP_GATT_PERM_READ,
                                                                        sizeof(hidReportRefKeyIn), sizeof(hidReportRefKeyIn),
                                                                        hidReportRefKeyIn}},
-/**
-     // Report Characteristic Declaration
-    [HIDD_LE_IDX_REPORT_LED_OUT_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
-                                                                         ESP_GATT_PERM_READ,
-                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
-                                                                         (uint8_t *)&char_prop_read_write_write_nr}},
-
-
-    [HIDD_LE_IDX_REPORT_LED_OUT_VAL]            = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
-                                                                       ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE,
-                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
-                                                                       NULL}},
-    [HIDD_LE_IDX_REPORT_LED_OUT_REP_REF]      =  {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
-                                                                       ESP_GATT_PERM_READ,
-                                                                       sizeof(hidReportRefLedOut), sizeof(hidReportRefLedOut),
-                                                                       hidReportRefLedOut}},
-**/
                                                                        
     [HIDD_LE_IDX_REPORT_MOUSE_IN_CHAR]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
                                                                          ESP_GATT_PERM_READ,
@@ -593,6 +675,213 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
                                                                        sizeof(hidReportRefFeature), sizeof(hidReportRefFeature),
                                                                        hidReportRefFeature}},
 };
+/// Full Hid device Database Description - Used to add attributes into the database - without Joystick report
+#if CONFIG_MODULE_USEJOYSTICK
+static esp_gatts_attr_db_t hidd_le_gatt_db_no_joy[HIDD_LE_IDX_NB] =
+{
+            // HID Service Declaration
+    [HIDD_LE_IDX_SVC]                       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&primary_service_uuid,
+                                                             ESP_GATT_PERM_READ_ENCRYPTED, sizeof(uint16_t), sizeof(hid_le_svc),
+                                                            (uint8_t *)&hid_le_svc}},
+
+    // HID Service Declaration
+    [HIDD_LE_IDX_INCL_SVC]               = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&include_service_uuid,
+                                                            ESP_GATT_PERM_READ,
+                                                            sizeof(esp_gatts_incl_svc_desc_t), sizeof(esp_gatts_incl_svc_desc_t),
+                                                            (uint8_t *)&incl_svc}},
+
+    // HID Information Characteristic Declaration
+    [HIDD_LE_IDX_HID_INFO_CHAR]     = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                            ESP_GATT_PERM_READ,
+                                                            CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                            (uint8_t *)&char_prop_read}},
+    // HID Information Characteristic Value
+    [HIDD_LE_IDX_HID_INFO_VAL]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_info_char_uuid,
+                                                            ESP_GATT_PERM_READ,
+                                                            sizeof(hids_hid_info_t), sizeof(hidInfo),
+                                                            (uint8_t *)&hidInfo}},
+
+    // HID Control Point Characteristic Declaration
+    [HIDD_LE_IDX_HID_CTNL_PT_CHAR]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                              ESP_GATT_PERM_READ,
+                                                              CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                              (uint8_t *)&char_prop_write_nr}},
+    // HID Control Point Characteristic Value
+    [HIDD_LE_IDX_HID_CTNL_PT_VAL]    = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_control_point_uuid,
+                                                             ESP_GATT_PERM_WRITE,
+                                                             sizeof(uint8_t), 0,
+                                                             NULL}},
+
+    // Report Map Characteristic Declaration
+    [HIDD_LE_IDX_REPORT_MAP_CHAR]   = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                              ESP_GATT_PERM_READ,
+                                                              CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                              (uint8_t *)&char_prop_read}},
+    // Report Map Characteristic Value
+    [HIDD_LE_IDX_REPORT_MAP_VAL]     = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_map_uuid,
+                                                              ESP_GATT_PERM_READ,
+                                                              HIDD_LE_REPORT_MAP_MAX_LEN, sizeof(hidReportMapNoJoy),
+                                                              (uint8_t *)&hidReportMapNoJoy}},
+
+    // Report Map Characteristic - External Report Reference Descriptor
+    [HIDD_LE_IDX_REPORT_MAP_EXT_REP_REF]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_repot_map_ext_desc_uuid,
+                                                                        ESP_GATT_PERM_READ,
+                                                                        sizeof(uint16_t), sizeof(uint16_t),
+                                                                        (uint8_t *)&hidExtReportRefDesc}},
+
+    // Protocol Mode Characteristic Declaration
+    [HIDD_LE_IDX_PROTO_MODE_CHAR]            = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                        ESP_GATT_PERM_READ,
+                                                                        CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                        (uint8_t *)&char_prop_read_write}},
+    // Protocol Mode Characteristic Value
+    [HIDD_LE_IDX_PROTO_MODE_VAL]               = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_proto_mode_uuid,
+                                                                        (ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE),
+                                                                        sizeof(uint8_t), sizeof(hidProtocolMode),
+                                                                        (uint8_t *)&hidProtocolMode}},
+                                                                        
+    // Report Characteristic Declaration
+    [HIDD_LE_IDX_REPORT_KEY_IN_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                         ESP_GATT_PERM_READ,
+                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                         (uint8_t *)&char_prop_read_notify}},
+    // Report Characteristic Value
+    [HIDD_LE_IDX_REPORT_KEY_IN_VAL]            = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
+                                                                       NULL}},
+    // Report KEY INPUT Characteristic - Client Characteristic Configuration Descriptor
+    [HIDD_LE_IDX_REPORT_KEY_IN_CCC]              = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                      (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE),
+                                                                      sizeof(uint16_t), 0,
+                                                                      NULL}},
+     // Report Characteristic - Report Reference Descriptor
+    [HIDD_LE_IDX_REPORT_KEY_IN_REP_REF]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       sizeof(hidReportRefKeyIn), sizeof(hidReportRefKeyIn),
+                                                                       hidReportRefKeyIn}},
+                                                                       
+    [HIDD_LE_IDX_REPORT_MOUSE_IN_CHAR]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                         ESP_GATT_PERM_READ,
+                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                         (uint8_t *)&char_prop_read_notify}},
+
+    [HIDD_LE_IDX_REPORT_MOUSE_IN_VAL]        = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
+                                                                       NULL}},
+
+    [HIDD_LE_IDX_REPORT_MOUSE_IN_CCC]        = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                      (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE),
+                                                                      sizeof(uint16_t), 0,
+                                                                      NULL}},
+
+    [HIDD_LE_IDX_REPORT_MOUSE_REP_REF]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       sizeof(hidReportRefMouseIn), sizeof(hidReportRefMouseIn),
+                                                                       hidReportRefMouseIn}},
+                                                                       
+    [HIDD_LE_IDX_REPORT_JOY_IN_CHAR]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                         ESP_GATT_PERM_READ,
+                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                         (uint8_t *)&char_prop_read_notify}},
+
+    [HIDD_LE_IDX_REPORT_JOY_IN_VAL]        = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
+                                                                       NULL}},
+
+    [HIDD_LE_IDX_REPORT_JOY_IN_CCC]        = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                      (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE),
+                                                                      sizeof(uint16_t), 0,
+                                                                      NULL}},
+
+    [HIDD_LE_IDX_REPORT_JOY_REP_REF]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       sizeof(hidReportRefJoyIn), sizeof(hidReportRefJoyIn),
+                                                                       hidReportRefJoyIn}},
+                                                                                                                                             
+    // Report Characteristic Declaration
+    [HIDD_LE_IDX_REPORT_CC_IN_CHAR]         = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                         ESP_GATT_PERM_READ,
+                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                         (uint8_t *)&char_prop_read_notify}},
+    // Report Characteristic Value
+    [HIDD_LE_IDX_REPORT_CC_IN_VAL]            = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
+                                                                       NULL}},
+    // Report KEY INPUT Characteristic - Client Characteristic Configuration Descriptor
+    [HIDD_LE_IDX_REPORT_CC_IN_CCC]              = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                      (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE_ENCRYPTED),
+                                                                      sizeof(uint16_t), 0,
+                                                                      NULL}},
+     // Report Characteristic - Report Reference Descriptor
+    [HIDD_LE_IDX_REPORT_CC_IN_REP_REF]       = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       sizeof(hidReportRefCCIn), sizeof(hidReportRefCCIn),
+                                                                       hidReportRefCCIn}},
+
+    // Boot Keyboard Input Report Characteristic Declaration
+    [HIDD_LE_IDX_BOOT_KB_IN_REPORT_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                        ESP_GATT_PERM_READ,
+                                                                        CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                        (uint8_t *)&char_prop_read_notify}},
+    // Boot Keyboard Input Report Characteristic Value
+    [HIDD_LE_IDX_BOOT_KB_IN_REPORT_VAL]   = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_kb_input_uuid,
+                                                                        ESP_GATT_PERM_READ,
+                                                                        HIDD_LE_BOOT_REPORT_MAX_LEN, 0,
+                                                                        NULL}},
+    // Boot Keyboard Input Report Characteristic - Client Characteristic Configuration Descriptor
+    [HIDD_LE_IDX_BOOT_KB_IN_REPORT_NTF_CFG]  = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                              (ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE),
+                                                                              sizeof(uint16_t), 0,
+                                                                              NULL}},
+
+    // Boot Keyboard Output Report Characteristic Declaration
+    [HIDD_LE_IDX_BOOT_KB_OUT_REPORT_CHAR]    = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                              ESP_GATT_PERM_READ,
+                                                                              CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                              (uint8_t *)&char_prop_read_write_write_nr}},
+    // Boot Keyboard Output Report Characteristic Value
+    [HIDD_LE_IDX_BOOT_KB_OUT_REPORT_VAL]      = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_kb_output_uuid,
+                                                                              (ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE),
+                                                                              HIDD_LE_BOOT_REPORT_MAX_LEN, 0,
+                                                                              NULL}},
+
+    // Boot Mouse Input Report Characteristic Declaration
+    [HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_CHAR] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                              ESP_GATT_PERM_READ,
+                                                                              CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                              (uint8_t *)&char_prop_read_notify}},
+    // Boot Mouse Input Report Characteristic Value
+    [HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_VAL]   = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_mouse_input_uuid,
+                                                                              ESP_GATT_PERM_READ,
+                                                                              HIDD_LE_BOOT_REPORT_MAX_LEN, 0,
+                                                                              NULL}},
+    // Boot Mouse Input Report Characteristic - Client Characteristic Configuration Descriptor
+    [HIDD_LE_IDX_BOOT_MOUSE_IN_REPORT_NTF_CFG]    = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid,
+                                                                                      (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE),
+                                                                                      sizeof(uint16_t), 0,
+                                                                                      NULL}},
+
+    // Report Characteristic Declaration
+    [HIDD_LE_IDX_REPORT_CHAR]                    = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_declaration_uuid,
+                                                                         ESP_GATT_PERM_READ,
+                                                                         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE,
+                                                                         (uint8_t *)&char_prop_read_write}},
+    // Report Characteristic Value
+    [HIDD_LE_IDX_REPORT_VAL]                      = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       HIDD_LE_REPORT_MAX_LEN, 0,
+                                                                       NULL}},
+    // Report Characteristic - Report Reference Descriptor
+    [HIDD_LE_IDX_REPORT_REP_REF]               = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&hid_report_ref_descr_uuid,
+                                                                       ESP_GATT_PERM_READ,
+                                                                       sizeof(hidReportRefFeature), sizeof(hidReportRefFeature),
+                                                                       hidReportRefFeature}},
+};
+#endif
 
 static void hid_add_id_tbl(void);
 
@@ -670,7 +959,15 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 incl_svc.end_hdl = incl_svc.start_hdl + BAS_IDX_NB -1;
                 ESP_LOGI(HID_LE_PRF_TAG, "%s(), start added the hid service to the stack database. incl_handle = %d",
                            __func__, incl_svc.start_hdl);
-                esp_ble_gatts_create_attr_tab(hidd_le_gatt_db, gatts_if, HIDD_LE_IDX_NB, 0);
+                #if CONFIG_MODULE_USEJOYSTICK
+                  if(gamepadenabled) {
+                    esp_ble_gatts_create_attr_tab(hidd_le_gatt_db, gatts_if, HIDD_LE_IDX_NB, 0);
+                  } else {
+                    esp_ble_gatts_create_attr_tab(hidd_le_gatt_db_no_joy, gatts_if, HIDD_LE_IDX_NB, 0);
+                  }
+                #else
+                  esp_ble_gatts_create_attr_tab(hidd_le_gatt_db, gatts_if, HIDD_LE_IDX_NB, 0);
+                #endif
             }
             if (param->add_attr_tab.num_handle == HIDD_LE_IDX_NB &&
                 param->add_attr_tab.status == ESP_GATT_OK) {
@@ -710,13 +1007,6 @@ void hidd_le_create_service(esp_gatt_if_t gatts_if)
        After finish to added the battery service then can added the hid service. */
     esp_ble_gatts_create_attr_tab(bas_att_db, gatts_if, BAS_IDX_NB, 0);
 
-}
-
-void hidd_le_init(void)
-{
-
-    // Reset the hid device target environment
-    memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
 }
 
 void hidd_clcb_alloc (uint16_t conn_id, esp_bd_addr_t bda)
@@ -786,9 +1076,10 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 }
 
 
-esp_err_t hidd_register_cb(void)
+esp_err_t hidd_register_cb(uint8_t enablegamepad)
 {
 	esp_err_t status;
+  if(enablegamepad) gamepadenabled = 1;
 	status = esp_ble_gatts_register_callback(gatts_event_handler);
 	return status;
 }

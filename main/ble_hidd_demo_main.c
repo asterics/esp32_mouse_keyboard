@@ -348,6 +348,8 @@ void update_config()
     if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - bt name");
     err = nvs_set_u8(my_handle, "locale", config.locale);
     if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - locale");
+    err = nvs_set_u8(my_handle, "joyactive", config.joystick_active);
+    if(err != ESP_OK) ESP_LOGE("MAIN","error saving NVS - joystick state");
     printf("Committing updates in NVS ... ");
     err = nvs_commit(my_handle);
     printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
@@ -549,32 +551,53 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 
 void processCommand(struct cmdBuf *cmdBuffer)
 {
-    //commands:
-    // $ID
-    // $PMx (0 or 1)
-    // $GP
-    // $DPx (number of paired device, starting with 0)
-    // $SW aabbccddeeff (select a BT addr to send the HID commands to)
-    // $GC get connected devices
-    // $NAME set name of bluetooth device
-    // $APx (0-4) Set the appearance value for advertising (0x03C0 - 0x03C4). See https://specificationrefs.bluetooth.com/assigned-values/Appearance%20Values.pdf page 8
-    // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
-    // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
-    // $CV clear all key/value pairs set with $SV
-    // $UG start flash update by searching for factory partition and rebooting there. Warning: not possible to boot back without flashing!
-    // $LGx (0,1,2): enable / disable logging system of ESP32.0 is level error, 1 is level info, 2 is level debug
+  //commands:
+  // $ID
+  // $PMx (0 or 1)
+  // $GP
+  // $DPx (number of paired device, starting with 0)
+  // $SW aabbccddeeff (select a BT addr to send the HID commands to)
+  // $GC get connected devices
+  // $NAME set name of bluetooth device
+  // $JPx (0,1) en- / disable the joystick interface (for iOS compatibility) [available if compiled with Joystick support]
+  // $APx (0-4) Set the appearance value for advertising (0x03C0 - 0x03C4; default is mouse). See https://specificationrefs.bluetooth.com/assigned-values/Appearance%20Values.pdf page 8
+  // $GV <key>  get the value of the given key from NVS. Note: no spaces in <key>! max. key length: 15
+  // $SV <key> <value> set the value of the given key & store to NVS. Note: no spaces in <key>!
+  // $CV clear all key/value pairs set with $SV
+  // $UG start flash update by searching for factory partition and rebooting there. Warning: not possible to boot back without flashing!
+  // $LGx (0,1,2): enable / disable logging system of ESP32.0 is level error, 1 is level info, 2 is level debug
 
-    if(cmdBuffer->bufferLength < 2) return;
-    //easier this way than typecast in each str* function
-    const char *input = (const char *) cmdBuffer->buf;
-    int len = cmdBuffer->bufferLength;
-    const char *nl = "\r\n";
-    esp_ble_bond_dev_t * btdevlist;
-    int counter;
-    esp_err_t ret;
+  if(cmdBuffer->bufferLength < 2) return;
+  //easier this way than typecast in each str* function
+  const char *input = (const char *) cmdBuffer->buf;
+  int len = cmdBuffer->bufferLength;
+  const char *nl = "\r\n";
+  esp_ble_bond_dev_t * btdevlist;
+  int counter;
+  esp_err_t ret;
+  
+  #if CONFIG_MODULE_USEJOYSTICK
+  /**++++ (de-)activate joystick ++++*/
+  if(strncmp(input,"JP",2) == 0)
+  {
+    uint8_t joystate = input[2] - '0';
+    if(joystate) config.joystick_active = 1;
+    else config.joystick_active = 0;
+    update_config();
+    ESP_LOGI(EXT_UART_TAG,"new joystick state: %d, will show on next reboot", config.joystick_active);
+    if(cmdBuffer->sendToUART != 0) 
+    {
+      uart_write_bytes(ext_uart_num, "JS:",strlen("JS:"));
+      if(joystate) uart_write_bytes(ext_uart_num, "1",1);
+      else uart_write_bytes(ext_uart_num, "0",1);
+      uart_write_bytes(ext_uart_num,nl,sizeof(nl)); //newline
+    }
+    return;
+  }
+  #endif
     
   /**++++ set BLE appearance ++++*/
-  if(strncmp(input,"AP ", 2) == 0)
+  if(strncmp(input,"AP", 2) == 0)
   {
     uint8_t appv = input[2] - '0';
     if(appv <= 4)
@@ -1551,6 +1574,14 @@ void app_main(void)
         strcpy(config.bt_device_name, GATTS_TAG);
     } else ESP_LOGI("MAIN","bt device name is: %s",config.bt_device_name);
 
+    //get from NVS if the joystick should be registered
+    #if CONFIG_MODULE_USEJOYSTICK
+    config.joystick_active = 0;
+    nvs_get_u8(my_handle, "joyactive", &config.joystick_active);
+    ESP_LOGI("MAIN","Joystick: %d",config.joystick_active);
+    #endif
+    
+    //get locale
     ret = nvs_get_u8(my_handle, "locale", &config.locale);
     //if(ret != ESP_OK || config.locale >= LAYOUT_MAX)
     ///@todo implement keyboard layouts.
@@ -1570,7 +1601,7 @@ void app_main(void)
     }
     ///register the callback function to the gap module
     esp_ble_gap_register_callback(gap_event_handler);
-    esp_hidd_register_callbacks(hidd_event_callback);
+    esp_hidd_register_callbacks(hidd_event_callback,config.joystick_active);
 
     /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_BOND;     //bonding with peer device after authentication

@@ -35,7 +35,7 @@
 // HID consumer control input report length
 #define HID_CC_IN_RPT_LEN           2
 
-esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks)
+esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks, uint8_t enablegamepad)
 {
     esp_err_t hidd_status;
 
@@ -45,7 +45,7 @@ esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks)
         return ESP_FAIL;
     }
 
-    if((hidd_status = hidd_register_cb()) != ESP_OK) {
+    if((hidd_status = hidd_register_cb(enablegamepad)) != ESP_OK) {
         return hidd_status;
     }
 

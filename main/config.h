@@ -27,6 +27,7 @@
 typedef struct config_data {
     char bt_device_name[MAX_BT_DEVICENAME_LENGTH];
     uint8_t locale;
+    uint8_t joystick_active;
 } config_data_t;
 
 

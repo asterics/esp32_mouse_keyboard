@@ -130,11 +130,12 @@ typedef void (*esp_hidd_event_cb_t) (esp_hidd_cb_event_t event, esp_hidd_cb_para
  * @brief           This function is called to receive hid device callback event
  *
  * @param[in]    callbacks: callback functions
+ * @param[in]    enablegamepad: If != 0, the gamepad interface is enabled (necessary for iOS compat.)
  *
  * @return         ESP_OK - success, other - failed
  *
  */
-esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks);
+esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks, uint8_t enablegamepad);
 
 /**
  *

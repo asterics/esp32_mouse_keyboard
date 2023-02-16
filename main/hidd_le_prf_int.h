@@ -288,7 +288,7 @@ void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value
 
 void hidd_get_attr_value(uint16_t handle, uint16_t *length, uint8_t **value);
 
-esp_err_t hidd_register_cb(void);
+esp_err_t hidd_register_cb(uint8_t enablegamepad);
 
 
 #endif  ///__HID_DEVICE_LE_PRF__

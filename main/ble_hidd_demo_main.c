@@ -1117,8 +1117,7 @@ void uart_external_task(void *pvParameters)
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT        
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
     };
     if(onArduinoRP2040) uart_config.baud_rate = 115200;
 
@@ -1412,6 +1411,12 @@ void app_main(void)
     ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
     if (ret) {
         ESP_LOGE(HID_DEMO_TAG, "%s enable controller failed\n", __func__);
+        return;
+    }
+    
+    ret = esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT,ESP_PWR_LVL_N12);
+    if (ret) {
+        ESP_LOGE(HID_DEMO_TAG, "%s BLE TX Power set failed\n", __func__);
         return;
     }
 

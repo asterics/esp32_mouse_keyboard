@@ -6,7 +6,22 @@ menu "esp32_mouse_keyboard / FLipMouse & FABI config"
 			If this option is enabled, a FLipMouse/FABI Bluetooth module
 			is built. If disabled, this project acts as demo code for Bluetooth
 			HID code.
-			
+      
+  menu "Select device"
+    visible if USE_AS_FLIPMOUSE_FABI
+    choice MODULE_TYPE
+        prompt "Module type"
+        help
+            Specify the module type (Arduino Nano RP2040 Connect or esp32miniBT module).
+            
+        config MODULE_MINIBT
+            bool "esp32miniBT module"
+
+        config MODULE_NANO
+            bool "Arduino Nano Connect RP2040 with uBlox Nina"
+        endchoice
+  endmenu
+  
 	menu "Pinning for UART RX/TX & LED (if not a defined module)"
 		visible if !USE_AS_FLIPMOUSE_FABI
 		

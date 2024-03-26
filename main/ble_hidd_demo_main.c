@@ -1014,8 +1014,12 @@ void processCommand(struct cmdBuf *cmdBuffer)
                 uart_write_bytes(ext_uart_num, nl, sizeof(nl));
                 ESP_LOGI(EXT_UART_TAG, "Addon board in upgrade mode");
                 //LED off
-                if(onArduinoRP2040) gpio_set_level(indicator_led, 1);
-                else gpio_set_level(indicator_led, 0);
+                #if CONFIG_MODULE_NANO
+                gpio_set_level(indicator_led, 1);
+                #endif
+                #if CONFIG_MODULE_MINIBT
+                gpio_set_level(indicator_led, 0);
+                #endif
                 esp_restart();
             }else {
                 ESP_LOGI(EXT_UART_TAG, "Booting factory partition not possible");
@@ -1136,9 +1140,7 @@ void uart_external_task(void *pvParameters)
     char character;
     struct cmdBuf cmdBuffer;
     int changePinning = 0;
-    
-    if(!onArduinoRP2040)
-    {
+    #if CONFIG_MODULE_MINIBT
       /*  determine if we should switch RX/TX pins.  */
       /*   we enable the RX pin as GPIO with pull-down.
        * 	 if "1" is read, this is the "real" RX pin. If not, it
@@ -1165,7 +1167,7 @@ void uart_external_task(void *pvParameters)
         ESP_LOGW(EXT_UART_TAG,"Switching pins!");
         changePinning = 1;
       }
-    }
+    #endif
 
 
     //Install UART driver, and get the queue.
@@ -1182,8 +1184,10 @@ void uart_external_task(void *pvParameters)
         .source_clk = UART_SCLK_DEFAULT,
     };
     
-    if(onArduinoRP2040) uart_config.baud_rate = 115200;
-
+    #if CONFIG_MODULE_NANO
+      uart_config.baud_rate = 115200;
+    #endif
+    
     //update UART config
     ret = uart_param_config(ext_uart_num, &uart_config);
     if(ret != ESP_OK)
@@ -1192,15 +1196,14 @@ void uart_external_task(void *pvParameters)
     }
 
     //set IO pins
-    if(!onArduinoRP2040)
-    {
+    #if CONFIG_MODULE_MINIBT
       if(changePinning) ret = uart_set_pin(ext_uart_num, ext_uart_rx, ext_uart_tx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
       else ret = uart_set_pin(ext_uart_num, ext_uart_tx, ext_uart_rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
       if(ret != ESP_OK)
       {
         ESP_LOGE(EXT_UART_TAG,"external UART set pin failed");
       }
-    }
+    #endif
     uart_driver_install(ext_uart_num, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
 
     ESP_LOGI(EXT_UART_TAG,"external UART processing task started");
@@ -1260,7 +1263,7 @@ void uart_console_task(void *pvParameters)
     commands.state=CMDSTATE_IDLE;
     #if CONFIG_MODULE_USEJOYSTICK
 		uint8_t joy[11] = {0};
-	#endif
+    #endif
 
     //Install UART driver, and get the queue.
     uart_driver_install(CONSOLE_UART_NUM, UART_FIFO_LEN * 2, UART_FIFO_LEN * 2, 0, NULL, 0);
@@ -1271,14 +1274,14 @@ void uart_console_task(void *pvParameters)
     {
         // read single byte
         uart_read_bytes(CONSOLE_UART_NUM, (uint8_t*) &character, 1, portMAX_DELAY);
-        if(onArduinoRP2040)
-        {
+        #if CONFIG_MODULE_NANO
           //if communcating with the RP2040, we need "dual-use" on UART0:
           // * debugging via esp-idf logger
           // * receiving HID stuff & commands
           //so we simply do the same stuff as in uart_external task
           uart_parse_command(character,&commands);
-        } else {
+        #endif
+        #if CONFIG_MODULE_MINIBT
           //enable character forwarding to command parser (used to test the commands)
           if(character == '$' && hid_or_command == 0) hid_or_command = 1;
           //if command mode is enabled, forward to uart_parse_command and continue with next character receiving.
@@ -1288,7 +1291,7 @@ void uart_console_task(void *pvParameters)
             if(commands.state == CMDSTATE_IDLE) hid_or_command = 0;
             continue;
           }
-        }
+        #endif
 
         //if not in command mode, issue HID test commands.
         if(!isConnected()) {
@@ -1445,41 +1448,25 @@ void uart_console_task(void *pvParameters)
 
 void app_main(void)
 {
-    //first of all, we need to detect if we are running on the Arduino Connect RP2040.
-    //if yes:
-    // -) different IOs for signalling & UART
-    // -) disable UART0 logging output on default
-    // -) different baudrate
-    //we use the flash size to detect the board:
-    // -) WROOM32D has 4MB
-    // -) Nina board on Arduino has 2MB
-    uint32_t size_flash_chip;
-    esp_flash_get_size(NULL, &size_flash_chip);
-    size_flash_chip = size_flash_chip >> 20; //now we have 2,4,8,..
-    if(size_flash_chip > 2)
-    {
-      ESP_LOGW(HID_DEMO_TAG,"Not on Arduino RP2040 connect, using WROOM setup");
-    } else onArduinoRP2040 = true;
-  
     esp_err_t ret;
-    //if we have this firmware on the Arduino,
-    //we should disable logging on startup.
-    if(onArduinoRP2040) esp_log_level_set("*",ESP_LOG_ERROR);
     
     //set external UART number according to setup
     //and setup anything pin related.
     #if CONFIG_USE_AS_FLIPMOUSE_FABI
-      if(onArduinoRP2040)
-      {
+      #if CONFIG_MODULE_NANO
+        //if we have this firmware on the Arduino,
+        //we should disable logging on startup.
+        esp_log_level_set("*",ESP_LOG_ERROR);
         ext_uart_num = UART_NUM_0;
         //GPIO26 is blue; 25 is green and 27 red
         indicator_led = GPIO_NUM_26;
-      } else {
+      #endif
+      #if CONFIG_MODULE_MINIBT
         ext_uart_num = UART_NUM_2;
         ext_uart_rx = GPIO_NUM_17;
         ext_uart_tx = GPIO_NUM_16;
         indicator_led = GPIO_NUM_5;
-      }
+      #endif
     #else
       ext_uart_num = CONFIG_MODULE_UART_NR;
       ext_uart_rx = CONFIG_MODULE_RX_PIN;
@@ -1622,7 +1609,9 @@ void app_main(void)
     //start active scan
     //if(esp_ble_gap_set_scan_params(&scan_params) != ESP_OK) ESP_LOGE("MAIN","Cannot set scan params");
     //a console for HID debugging (sending simple mouse/kbd commands) is not available on Arduino RP2040 Connect.
-    if(!onArduinoRP2040) xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
+    #if CONFIG_MODULE_MINIBT
+      xTaskCreate(&uart_console_task,  "console", 4096, NULL, configMAX_PRIORITIES, NULL);
+    #endif
     xTaskCreate(&uart_external_task, "external", 4096, NULL, configMAX_PRIORITIES, NULL);
     ///@todo maybe reduce stack size for blink task? 4k words for blinky :-)?
     xTaskCreate(&blink_task, "blink", 4096, NULL, configMAX_PRIORITIES, NULL);
